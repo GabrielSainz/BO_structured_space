@@ -6,6 +6,7 @@ please refer to the README.md.
 """
 
 # mypy: disable-error-code="import-untyped"
+from pathlib import Path
 from uuid import uuid4
 
 import click
@@ -140,7 +141,9 @@ def _main(
     except BudgetExhaustedException:
         print("Budget exhausted.")
 
-    np.save(f"./results/new_vae_10_chain_100_steps_with_stoch_sampling/{function_name}_{seed}.npy", solver.get_best_performance())
+    output_dir = Path("./results/new_vae_10_chain_100_steps_with_stoch_sampling")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    np.save(output_dir / f"{function_name}_{seed}.npy", solver.get_best_performance())
 
 @click.command()
 @click.option(

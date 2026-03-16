@@ -19,6 +19,7 @@ from hdbo_benchmark.utils.experiments.load_metadata_for_vaes import (
     load_alphabet_for_pmo,
     load_sequence_length_for_pmo,
 )
+from hdbo_benchmark.utils.tdc_compat import patch_broken_tdc_chem_utils
 from hdbo_benchmark.utils.logging.wandb_observer import (
     ObserverConfig,
     initialize_observer,
@@ -47,6 +48,7 @@ def tokenize_selfies(x: str, max_sequence_length: int) -> list[str]:
 
 
 def _load_pmo_problem(function_name: str) -> Problem:
+    patch_broken_tdc_chem_utils()
     problem = poli.create(
         name=function_name,
         string_representation="SELFIES",

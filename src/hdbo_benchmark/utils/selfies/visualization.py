@@ -6,7 +6,6 @@ using RDKit and cairosvg.
 import io
 from pathlib import Path
 
-import cairosvg  # type: ignore[import]
 import numpy as np
 import PIL.Image as Image
 import selfies as sf  # type: ignore[import]
@@ -55,6 +54,8 @@ def selfie_to_png(
     Taken and adapted from the following stack overflow answer:
     https://stackoverflow.com/a/73449342/3516175
     """
+    import cairosvg  # type: ignore[import]
+
     svg = draw_molecule_from_selfies(selfie, width, height, title)
 
     # Export to png
@@ -64,6 +65,8 @@ def selfie_to_png(
 def selfie_to_image(
     selfie: str, width: int = 200, height: int = 200, title: str | None = None, dpi=300
 ) -> Image.Image:
+    import cairosvg  # type: ignore[import]
+
     svg = draw_molecule_from_selfies(selfie, width, height, title)
     s_png = cairosvg.svg2png(bytestring=svg, dpi=dpi)
     s_img = Image.open(io.BytesIO(s_png))
