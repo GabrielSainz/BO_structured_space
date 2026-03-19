@@ -6,26 +6,100 @@
 
 This repository contains the code to apply COWBOYS to a benchmark of **high-dimensional Bayesian optimization** over discrete sequences using [poli](https://github.com/MachineLearningLifeScience/poli) and [poli-baselines](https://github.com/MachineLearningLifeScience/poli-baselines).
 
-### Running your solver locally
 
-We provide a `requirements.txt`/`environment.yml` you can use to create an environment for running the benchmarks. Afterwards, install the additional packages:
+### Recommended setup
+
+The most reliable setup is a fresh Conda environment with Python 3.10.
 
 ```bash
 conda create -n hdbo_benchmark python=3.10
 conda activate hdbo_benchmark
-pip install -r requirements.txt
-pip install gauche
-pip install selfies
-pip install -e .
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m pip install gauche selfies
+python -m pip install -e .
 ```
-and change the WANDB_PROJECT and WANDB_ENTITY in src/hdbo_benchmark/utils/constants.py to link your WANDB account for easy visualisation of results.
 
-To run COWBOYS across all the molecular search benchmark problems, simply run the bash script
+For the PMO tasks used by `run.py`, install the extra chemistry/runtime dependencies in the same environment:
+
+```bash
+conda install -c conda-forge "rdkit<2024.03" -y
+python -m pip install --upgrade huggingface_hub
+```
+
+These two quick checks should work before you launch the benchmark:
+
+```bash
+python -c "import rdkit; print(rdkit.__version__)"
+python -c "from tdc import Oracle; print('tdc ok')"
+```
+
+If you want Weights & Biases logging, set `WANDB_PROJECT` and `WANDB_ENTITY` in `src/hdbo_benchmark/utils/constants.py`. For a simple local run, use `--wandb-mode disabled`.
+
+### Run one PMO benchmark
+
+This reproduces a single COWBOYS run on the `albuterol_similarity` task using the pretrained 128-dimensional molecular VAE:
+
+```bash
+python run.py \
+  --function-name albuterol_similarity \
+  --solver-name cowboys \
+  --n-dimensions 128 \
+  --max-iter 300 \
+  --seed 1 \
+  --no-strict-on-hash \
+  --wandb-mode disabled \
+  --tag local-test
+```
+
+Important notes:
+
+- this does not train a VAE; it loads the pretrained checkpoint shipped with the repository
+- the first PMO run can take a bit longer because `poli` prepares the underlying task machinery
+- the final output is written to `results/new_vae_10_chain_100_steps_with_stoch_sampling/<function_name>_<seed>.npy`
+
+### Run the full PMO sweep
+
+To run COWBOYS across all molecular PMO tasks and seeds:
 
 ```bash
 ./run.sh
 ```
 
-assuming `hdbo_benchmark` is an environment in which you can run your solver, and in which this package is installed. The first time you run this script might take some time, while the testing environment is prepared.
+On Windows, use Git Bash, WSL, or translate the loop in `run.sh` into PowerShell commands.
 
-Individual problems can be ran for specific seeds using run.py.
+### What gets saved
+
+The main entry point `run.py` saves one local `.npy` file per run containing the best objective value found by the solver.
+
+If you run with WANDB enabled, the observer also logs:
+
+- `x`: the evaluated sequence or latent point
+- `y`: the objective value of that evaluation
+- `best_y`: the best score seen so far
+
+The repository also contains separate post-processing scripts under `src/hdbo_benchmark/results/` for creating tables and figures after many runs have finished.
+
+### Google Colab (experimental)
+
+Colab can work, but it is less reliable than a local Conda environment because the PMO stack depends on chemistry packages and TDC/poli integrations.
+
+Suggested Colab workflow:
+
+```python
+!git clone <your repo url>
+%cd ROTLSC
+!python -m pip install --upgrade pip
+!python -m pip install -r requirements.txt
+!python -m pip install gauche selfies huggingface_hub
+!python -m pip install "rdkit<2024.03"
+!python -m pip install -e .
+```
+
+Then run:
+
+```python
+!python run.py --function-name albuterol_similarity --solver-name cowboys --n-dimensions 128 --max-iter 300 --seed 1 --no-strict-on-hash --wandb-mode disabled --tag colab-test
+```
+
+If Colab dependency resolution fails, prefer a Linux or Windows Conda environment instead. For reproducibility, the local Conda route is the recommended one.

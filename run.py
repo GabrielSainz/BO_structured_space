@@ -129,8 +129,12 @@ def _main(
 
 
     print(solver)
-    if solver_name == "cowboys": # COWBOYS needs access to the VAE to suggest query points
+    if (
+        solver_name in CONTINUOUS_SPACE_SOLVERS
+        and hasattr(solver, "set_vae_and_bounds")
+    ):
         solver.set_vae_and_bounds(generative_model, bounds)
+        solver.bounds = bounds
         assert solver._given_vae
 
     # 3. Optimize
@@ -143,7 +147,7 @@ def _main(
 
     output_dir = Path("./results/new_vae_10_chain_100_steps_with_stoch_sampling")
     output_dir.mkdir(parents=True, exist_ok=True)
-    np.save(output_dir / f"{function_name}_{seed}.npy", solver.get_best_performance())
+    np.save(output_dir / f"{solver_name}_{function_name}_{seed}.npy", solver.get_best_performance())
 
 @click.command()
 @click.option(

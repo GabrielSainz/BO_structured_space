@@ -25,7 +25,8 @@ SOLVER_NAMES = [
     "pr",
     "saas_bo",
     "lambo2",
-    "cowboys"
+    "cowboys",
+    "cowboys_flow",
 ]
 
 SOLVERS_THAT_DONT_ALLOW_CUSTOM_INPUTS = [
@@ -55,6 +56,7 @@ SOLVER_NAME_TO_ENV = {
     "baxus": "hdbo_baxus",
     "turbo": "hdbo_benchmark",
     "cowboys": "hdbo_benchmark",
+    "cowboys_flow": "hdbo_benchmark",
     "vanilla_bo_hvarfner": "hdbo_ax",
     "alebo": "hdbo_alebo",
     "bounce": "hdbo_bounce",
@@ -257,6 +259,17 @@ def load_solver_class(
                 }
             )
             return COWBOYS, solver_kwargs
+        case "cowboys_flow":
+            from cowboys_flow import COWBOYSFlow
+
+            torch.set_default_dtype(torch.float64)
+
+            solver_kwargs.update(
+                {
+                    "device": DEVICE,
+                }
+            )
+            return COWBOYSFlow, solver_kwargs
 
         case "bounce":
             from poli_baselines.solvers.bayesian_optimization.bounce import BounceSolver
