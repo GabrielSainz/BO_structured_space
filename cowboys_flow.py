@@ -312,6 +312,13 @@ class COWBOYSFlow(BaseBayesianOptimization):
         observed_unit_latents, y = self.get_history_as_arrays()
         observed_latents = self._to_tensor(self._unit_to_latent(observed_unit_latents))
         y = np.asarray(y, dtype=float).reshape(-1, 1)
+        best_score_so_far = (
+            float(np.nanmax(y)) if np.isfinite(y).any() else self.penalize_nans_with
+        )
+        print(
+            f"collected at {len(observed_unit_latents)} points so far, "
+            f"with best score so far as {best_score_so_far}"
+        )
 
         bo_state = self._fit_structured_bo_state(observed_latents, y)
 
@@ -326,6 +333,11 @@ class COWBOYSFlow(BaseBayesianOptimization):
 
         initial_states = self._initialize_chains(observed_latents, y.reshape(-1))
         mh_result = self._run_mh_sampling(bo_state, initial_states)
+        n_unique = self._count_unique_new_structures(
+            mh_result.sampled_latents,
+            bo_state.observed_structures,
+        )
+        print(f"did {self.n_mh_steps} steps and found {n_unique} unique")
         self._update_replay_buffer(mh_result.accepted_latents)
 
         selected_latents = self._select_candidates(
@@ -771,6 +783,12 @@ class COWBOYSFlow(BaseBayesianOptimization):
 
     def _latent_to_unit(self, latents: np.ndarray) -> np.ndarray:
         return from_range_to_unit_cube(latents, self.vae_bounds)
+
+    def _count_unique_new_structures(
+        self, sampled_latents: torch.Tensor, observed_structures: list[str]
+    ) -> int:
+        candidate_structures = self._decode_latents(sampled_latents)
+        return len(set(candidate_structures).difference(set(observed_structures)))
 
     def _to_tensor(self, values: np.ndarray | torch.Tensor) -> torch.Tensor:
         if isinstance(values, torch.Tensor):
