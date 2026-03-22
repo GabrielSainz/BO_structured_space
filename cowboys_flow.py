@@ -241,7 +241,6 @@ class FlowMixtureProposal:
         )
         return component_log_prob.sum(dim=-1)
 
-
 class COWBOYSFlow(BaseBayesianOptimization):
     def __init__(
         self,
@@ -251,13 +250,13 @@ class COWBOYSFlow(BaseBayesianOptimization):
         batch_size: int = 1,
         num_chains: int = 10,
         n_mh_steps: int = 100,
-        burn_in: int = 50,
+        burn_in: int = 0, # 0 , 50
         local_step_size: float = 0.4,
-        local_proposal_weight: float = 0.5,
-        pool_size: int = 128,
-        flow_training_steps: int = 50,
+        local_proposal_weight: float = 0.3, # 0.3 , 0.5
+        pool_size: int = 256, # 256, 128
+        flow_training_steps: int = 100, # 100, 50
         flow_hidden_dim: int | None = None,
-        flow_depth: int = 4,
+        flow_depth: int = 6, # 6, 4
         penalize_nans_with: float = -10.0,
         device: torch.device = torch.device("cpu"),
     ) -> None:
@@ -339,6 +338,13 @@ class COWBOYSFlow(BaseBayesianOptimization):
         )
         print(f"did {self.n_mh_steps} steps and found {n_unique} unique")
         self._update_replay_buffer(mh_result.accepted_latents)
+        print(
+            "mcmc diagnostics: "
+            f"acceptance_rate={mh_result.acceptance_rate:.3f}, "
+            f"accepted_moves={mh_result.accepted_latents.shape[0]}, "
+            f"post_burn_samples={mh_result.sampled_latents.shape[0]}, "
+            f"replay_buffer={self.accepted_latent_history.shape[0]}"
+        )
 
         selected_latents = self._select_candidates(
             mh_result.sampled_latents,
@@ -348,6 +354,7 @@ class COWBOYSFlow(BaseBayesianOptimization):
 
         self.last_sampling_diagnostics = {
             "acceptance_rate": mh_result.acceptance_rate,
+            "accepted_moves": int(mh_result.accepted_latents.shape[0]),
             "num_pool_latents": int(weighted_pool.latents.shape[0]),
             "num_mh_samples": int(mh_result.sampled_latents.shape[0]),
             "num_replay_latents": int(self.accepted_latent_history.shape[0]),

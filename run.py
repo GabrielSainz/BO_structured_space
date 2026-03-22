@@ -167,7 +167,7 @@ def _main(
 @click.option("--max-iter", type=int, default=100)
 @click.option("--strict-on-hash/--no-strict-on-hash", type=bool, default=True)
 @click.option("--force-run/--no-force-run", default=True)
-@click.option("--wandb-mode", type=str, default="online")
+@click.option("--wandb-mode", type=str, default="disabled")
 @click.option("--tag", type=str, default="default")
 def main(
     function_name: str,
