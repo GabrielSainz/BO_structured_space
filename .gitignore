@@ -72,6 +72,9 @@ data/bounce_results/
 # Results cache
 data/results_cache/
 
+# Results
+results/
+
 # Running experiments locally
 *.local.sh
 *_local.py
