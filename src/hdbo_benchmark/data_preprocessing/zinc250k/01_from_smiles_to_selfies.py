@@ -66,7 +66,7 @@ if __name__ == "__main__":
     TRANSFORMED_DATASET_DIR.mkdir(parents=True, exist_ok=True)
 
     # We load the dataset
-    with open(ASSETS_DIR / SAVED_DATASET_PATH, "rb") as fin:
+    with open(SAVED_DATASET_PATH, "rb") as fin:
         zinc250k = pickle.load(fin)
 
     # We transform the dataset
