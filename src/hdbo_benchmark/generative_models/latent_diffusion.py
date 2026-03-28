@@ -74,7 +74,11 @@ class LatentDiffusionDenoiser(nn.Module):
         self.network = nn.Sequential(*layers)
 
     def forward(self, noisy_latents: torch.Tensor, timesteps: torch.Tensor) -> torch.Tensor:
-        time_embedding = self.time_projection(self.time_embedding(timesteps))
+        time_embedding = self.time_embedding(timesteps).to(
+            device=noisy_latents.device,
+            dtype=noisy_latents.dtype,
+        )
+        time_embedding = self.time_projection(time_embedding)
         inputs = torch.cat([noisy_latents, time_embedding], dim=-1)
         return self.network(inputs)
 

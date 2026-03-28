@@ -348,6 +348,7 @@ def load_solver_from_problem(
     solver_name: str,
     problem: Problem,
     seed: int | None = None,
+    **solver_kwargs,
 ):
     f, data_package = problem.black_box, problem.data_package
     x0, y0 = data_package.supervised_data
@@ -362,6 +363,7 @@ def load_solver_from_problem(
         seed=seed,
         n_dimensions=n_dimensions,
         n_initial_points=x0.shape[0],
+        **solver_kwargs,
     )
 
     return solver_(

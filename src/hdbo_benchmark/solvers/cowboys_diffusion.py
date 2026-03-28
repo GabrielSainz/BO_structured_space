@@ -88,8 +88,8 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         batch_size: int = 1,
         guide_mode: str = "distill",
         weight_type: str = "pi",
-        num_candidates: int = 16,
-        num_diffusion_steps: int = 30,
+        num_candidates: int = 1000,
+        num_diffusion_steps: int = 100,
         guidance_scale: float = 1.0,
         clip_guidance: float = 1.0,
     ) -> None:

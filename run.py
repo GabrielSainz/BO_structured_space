@@ -38,6 +38,32 @@ from hdbo_benchmark.utils.logging.idempotence_of_experiments import (
 from hdbo_benchmark.utils.logging.wandb_observer import ObserverConfig
 
 
+def _format_parameter_for_path(value: float | int | str | None) -> str:
+    if value is None:
+        return "default"
+    if isinstance(value, float):
+        return f"{value:g}".replace("-", "m").replace(".", "p")
+    return str(value).replace("/", "_")
+
+
+def _build_output_dir(
+    solver_name: str,
+    sufix: str,
+    diffusion_config: dict[str, float | int | str | None],
+) -> Path:
+    if solver_name != "cowboys_diffusion":
+        return Path(f"./results/new_vae_10_chain_100_steps_with_stoch_sampling_{sufix}")
+
+    components = [
+        f"{name}-{_format_parameter_for_path(value)}"
+        for name, value in diffusion_config.items()
+    ]
+    if sufix:
+        components.append(f"tag-{_format_parameter_for_path(sufix)}")
+
+    return Path("./results/diffusion") / "__".join(components)
+
+
 def _main(
     function_name: str,
     solver_name: str,
@@ -50,6 +76,10 @@ def _main(
     tag: str,    
     sufix: str,
     diffusion_checkpoint_path: str | None,
+    num_diffusion_steps: int | None,
+    num_candidates: int | None,
+    guidance_scale: float | None,
+    clip_guidance: float | None,
 ):
     # Defining a unique experiment id
     experiment_id = f"{uuid4()}"
@@ -126,10 +156,22 @@ def _main(
     # problem.data_package = DataPackage(unsupervised_data=x0, supervised_data=(x0, y0))
 
     # load the solver
+    diffusion_solver_kwargs = {}
+    if solver_name == "cowboys_diffusion":
+        if num_diffusion_steps is not None:
+            diffusion_solver_kwargs["num_diffusion_steps"] = num_diffusion_steps
+        if num_candidates is not None:
+            diffusion_solver_kwargs["num_candidates"] = num_candidates
+        if guidance_scale is not None:
+            diffusion_solver_kwargs["guidance_scale"] = guidance_scale
+        if clip_guidance is not None:
+            diffusion_solver_kwargs["clip_guidance"] = clip_guidance
+
     solver = load_solver_from_problem(
         solver_name=solver_name,
         problem=problem,
         seed=seed,
+        **diffusion_solver_kwargs,
     )
 
 
@@ -157,7 +199,18 @@ def _main(
     except BudgetExhaustedException:
         print("Budget exhausted.")
 
-    output_dir = Path(f"./results/new_vae_10_chain_100_steps_with_stoch_sampling_{sufix}")
+    diffusion_config_for_path = {
+        "guide_mode": getattr(solver, "guide_mode", None),
+        "num_diffusion_steps": getattr(solver, "num_diffusion_steps", None),
+        "num_candidates": getattr(solver, "num_candidates", None),
+        "guidance_scale": getattr(solver, "guidance_scale", None),
+        "clip_guidance": getattr(solver, "clip_guidance", None),
+    }
+    output_dir = _build_output_dir(
+        solver_name=solver_name,
+        sufix=sufix,
+        diffusion_config=diffusion_config_for_path,
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     np.save(output_dir / f"{solver_name}_{function_name}_{seed}.npy", solver.get_best_performance())
 
@@ -183,6 +236,10 @@ def _main(
 @click.option("--tag", type=str, default="default")
 @click.option("--sufix", type=str, default="default")
 @click.option("--diffusion-checkpoint-path", type=str, default=None)
+@click.option("--num-diffusion-steps", type=int, default=None)
+@click.option("--num-candidates", type=int, default=None)
+@click.option("--guidance-scale", type=float, default=None)
+@click.option("--clip-guidance", type=float, default=None)
 def main(
     function_name: str,
     solver_name: str,
@@ -195,6 +252,10 @@ def main(
     tag: str,
     sufix: str,
     diffusion_checkpoint_path: str | None,
+    num_diffusion_steps: int | None,
+    num_candidates: int | None,
+    guidance_scale: float | None,
+    clip_guidance: float | None,
 ):
     _main(
         function_name,
@@ -208,6 +269,10 @@ def main(
         tag,
         sufix,
         diffusion_checkpoint_path,
+        num_diffusion_steps,
+        num_candidates,
+        guidance_scale,
+        clip_guidance,
     )
 
 
