@@ -1,19 +1,22 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from poli.benchmarks import PMOBenchmark
 from poli.core.problem import Problem
 
 from hdbo_benchmark.generative_models.onehot import OneHot
-from hdbo_benchmark.generative_models.protein_ae_factory import (
-    LitAutoEncoder,
-    ProteinAEFactory,
-)
 from hdbo_benchmark.generative_models.vae_factory import VAE, VAEFactory
+
+if TYPE_CHECKING:
+    from hdbo_benchmark.generative_models.protein_ae_factory import LitAutoEncoder
 
 
 def load_generative_model_and_bounds(
     function_name: str,
     latent_dim: int,
     problem: Problem,
-) -> tuple[VAE | LitAutoEncoder, tuple[float, float]]:
+) -> tuple[VAE | LitAutoEncoder | OneHot, tuple[float, float]]:
     match function_name:
         case function_name if function_name in PMOBenchmark(
             string_representation="SELFIES"
@@ -28,6 +31,10 @@ def load_generative_model_and_bounds(
 
             return vae, latent_space_bounds
         case "rfp_rasp":
+            from hdbo_benchmark.generative_models.protein_ae_factory import (
+                ProteinAEFactory,
+            )
+
             experiment_name = "benchmark_on_rasp"
             latent_space_bounds = (-15.0, 15.0)  # By inspecting z0.
             ae = ProteinAEFactory().create(latent_dim=latent_dim)
@@ -35,6 +42,10 @@ def load_generative_model_and_bounds(
 
             return ae, latent_space_bounds
         case "rfp_foldx_stability":
+            from hdbo_benchmark.generative_models.protein_ae_factory import (
+                ProteinAEFactory,
+            )
+
             latent_space_bounds = (-15.0, 15.0)  # By inspecting z0.
             ae = ProteinAEFactory().create(latent_dim=latent_dim)
             ae.eval()

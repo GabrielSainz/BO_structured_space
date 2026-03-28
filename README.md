@@ -24,7 +24,7 @@ For the PMO tasks used by `run.py`, install the extra chemistry/runtime dependen
 
 ```bash
 conda install -c conda-forge "rdkit<2024.03" -y
-python -m pip install --upgrade PyTDC huggingface_hub
+python -m pip install --upgrade PyTDC "huggingface_hub<1"
 ```
 
 These two quick checks should work before you launch the benchmark:
@@ -89,16 +89,20 @@ environment. On pip, that package is distributed as `PyTDC`. If `tdc` is
 missing, `poli` falls back to a Conda-based isolation path, which is exactly
 the failure mode you see on Colab.
 
+Colab is also sensitive to `huggingface_hub` versions. A recent `1.x` upgrade
+can clash with the older `transformers` stack that gets pulled in indirectly by
+`lightning`, so keep it below `1.0` there.
+
 Suggested Colab workflow:
 
 ```python
 !git clone <your repo url>
 %cd ROTLSC
 !python -m pip install --upgrade pip
+!python -m pip install "numpy<2" click
 !python -m pip install -r requirements.txt
-!python -m pip install gauche selfies PyTDC huggingface_hub
-!python -m pip install "rdkit<2024.03"
-!python -m pip install -e .
+!python -m pip install gauche selfies PyTDC "huggingface_hub<1" "rdkit<2024.03"
+!python -m pip install -e . --no-deps
 ```
 
 Then run:

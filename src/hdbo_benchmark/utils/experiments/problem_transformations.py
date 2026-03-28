@@ -1,4 +1,6 @@
-from typing import Callable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 from poli.core.black_box_information import BlackBoxInformation
@@ -6,13 +8,15 @@ from poli.core.data_package import DataPackage
 from poli.core.lambda_black_box import LambdaBlackBox
 from poli.core.problem import Problem
 
-from hdbo_benchmark.generative_models.ae_for_esm import LitAutoEncoder
 from hdbo_benchmark.generative_models.onehot import OneHot
 from hdbo_benchmark.generative_models.vae import VAE, OptimizedVAE
 from hdbo_benchmark.utils.experiments.normalization import (
     from_range_to_unit_cube,
     from_unit_cube_to_range,
 )
+
+if TYPE_CHECKING:
+    from hdbo_benchmark.generative_models.ae_for_esm import LitAutoEncoder
 
 
 def _in_latent_space_of_proteins(
@@ -116,13 +120,7 @@ def transform_problem_from_discrete_to_continuous(
     generative_model: VAE | LitAutoEncoder | OneHot,
     bounds: tuple[float, float],
 ) -> Problem:
-    if isinstance(generative_model, LitAutoEncoder):
-        continuous_f = _in_latent_space_of_proteins(
-            problem=problem,
-            ae=generative_model,
-            latent_space_bounds=bounds,
-        )
-    elif isinstance(generative_model, (VAE, OptimizedVAE)):
+    if isinstance(generative_model, (VAE, OptimizedVAE)):
         continuous_f = _in_the_latent_space_of_molecules(
             problem=problem,
             vae=generative_model,
@@ -135,9 +133,19 @@ def transform_problem_from_discrete_to_continuous(
             latent_space_bounds=bounds,
         )
     else:
-        raise ValueError(
-            f"The generative model must be either a LitAutoEncoder or a VAE. (Received {type(generative_model)})"
-        )
+        from hdbo_benchmark.generative_models.ae_for_esm import LitAutoEncoder
+
+        if isinstance(generative_model, LitAutoEncoder):
+            continuous_f = _in_latent_space_of_proteins(
+                problem=problem,
+                ae=generative_model,
+                latent_space_bounds=bounds,
+            )
+        else:
+            raise ValueError(
+                "The generative model must be either a LitAutoEncoder or a VAE. "
+                f"(Received {type(generative_model)})"
+            )
 
     z0_ = generative_model.encode_from_string_array(problem.x0)
     z0 = from_range_to_unit_cube(z0_, bounds)

@@ -19,7 +19,7 @@ def ensure_tdc_is_available() -> None:
         raise RuntimeError(
             "PMO tasks require the `tdc` module in the active Python "
             "environment. Install it with "
-            '`python -m pip install PyTDC huggingface_hub "rdkit<2024.03"` '
+            '`python -m pip install PyTDC "huggingface_hub<1" "rdkit<2024.03"` '
             'or install this repo with `python -m pip install -e ".[tdc]"`.'
         )
 
