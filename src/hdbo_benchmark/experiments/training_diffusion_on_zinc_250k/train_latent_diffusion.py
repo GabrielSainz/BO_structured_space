@@ -69,6 +69,7 @@ def main(
 ) -> None:
     torch.manual_seed(seed)
     np.random.seed(seed)
+    print(f"Using device: {DEVICE}")
 
     z_dim = infer_zinc_vae_latent_dim_from_checkpoint(vae_checkpoint_path)
     run_name = f"latent_diffusion_latent_dim-{z_dim}-seed-{seed}"
