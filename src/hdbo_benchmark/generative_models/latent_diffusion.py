@@ -16,7 +16,7 @@ from hdbo_benchmark.utils.constants import MODELS_DIR
 @dataclass(slots=True)
 class LatentDiffusionConfig:
     z_dim: int
-    T: int = 100
+    T: int = 200
     beta_start: float = 1e-4
     beta_end: float = 2e-2
     hidden_size: int = 256
