@@ -44,7 +44,8 @@ def _main(
     strict_on_hash: bool,
     force_run: bool,
     wandb_mode: str,
-    tag: str,
+    tag: str,    
+    sufix: str,
 ):
     # Defining a unique experiment id
     experiment_id = f"{uuid4()}"
@@ -145,7 +146,7 @@ def _main(
     except BudgetExhaustedException:
         print("Budget exhausted.")
 
-    output_dir = Path("./results/new_vae_10_chain_100_steps_with_stoch_sampling")
+    output_dir = Path(f"./results/new_vae_10_chain_100_steps_with_stoch_sampling_{sufix}")
     output_dir.mkdir(parents=True, exist_ok=True)
     np.save(output_dir / f"{solver_name}_{function_name}_{seed}.npy", solver.get_best_performance())
 
@@ -169,6 +170,7 @@ def _main(
 @click.option("--force-run/--no-force-run", default=True)
 @click.option("--wandb-mode", type=str, default="disabled")
 @click.option("--tag", type=str, default="default")
+@click.option("--sufix", type=str, default="default")
 def main(
     function_name: str,
     solver_name: str,
@@ -179,6 +181,7 @@ def main(
     force_run: bool,
     wandb_mode: str,
     tag: str,
+    sufix: str,
 ):
     _main(
         function_name,
@@ -190,6 +193,7 @@ def main(
         force_run,
         wandb_mode,
         tag,
+        sufix
     )
 
 

@@ -68,8 +68,44 @@ class WeightedLatentPool:
 @dataclass
 class MHSamplingResult:
     sampled_latents: torch.Tensor
+    sampled_sources: list[str]
     accepted_latents: torch.Tensor
     acceptance_rate: float
+    proposal_diagnostics: "ProposalDiagnostics"
+
+
+@dataclass
+class ProposalDiagnostics:
+    n_local_proposals: int
+    n_global_proposals: int
+    n_local_accepted: int
+    n_global_accepted: int
+    n_unique_local_proposed_structures: int
+    n_unique_global_proposed_structures: int
+    n_unique_local_accepted_structures: int
+    n_unique_global_accepted_structures: int
+
+    @property
+    def local_acceptance_rate(self) -> float:
+        return self.n_local_accepted / max(self.n_local_proposals, 1)
+
+    @property
+    def global_acceptance_rate(self) -> float:
+        return self.n_global_accepted / max(self.n_global_proposals, 1)
+
+    def to_dict(self) -> dict[str, float | int]:
+        return {
+            "n_local_proposals": self.n_local_proposals,
+            "n_global_proposals": self.n_global_proposals,
+            "n_local_accepted": self.n_local_accepted,
+            "n_global_accepted": self.n_global_accepted,
+            "local_acceptance_rate": self.local_acceptance_rate,
+            "global_acceptance_rate": self.global_acceptance_rate,
+            "n_unique_local_proposed_structures": self.n_unique_local_proposed_structures,
+            "n_unique_global_proposed_structures": self.n_unique_global_proposed_structures,
+            "n_unique_local_accepted_structures": self.n_unique_local_accepted_structures,
+            "n_unique_global_accepted_structures": self.n_unique_global_accepted_structures,
+        }
 
 
 class AffineCouplingLayer(nn.Module):
@@ -198,11 +234,11 @@ class FlowMixtureProposal:
         self.device = device
         self.dtype = dtype
 
-    def propose(self, current: torch.Tensor) -> torch.Tensor:
+    def propose(self, current: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         n_chains, latent_dim = current.shape
         proposals = self.flow.sample(n_chains)
         if self.local_weight <= 0.0:
-            return proposals
+            return proposals, torch.zeros(n_chains, device=self.device, dtype=torch.bool)
 
         use_local = torch.rand(n_chains, device=self.device) < self.local_weight
         if use_local.any():
@@ -212,7 +248,7 @@ class FlowMixtureProposal:
                 dtype=self.dtype,
             )
             proposals[use_local] = current[use_local] + self.local_step_size * local_noise
-        return proposals
+        return proposals, use_local
 
     def log_prob(self, proposed: torch.Tensor, current: torch.Tensor) -> torch.Tensor:
         local_log_prob = self._local_log_prob(proposed, current)
@@ -248,12 +284,12 @@ class COWBOYSFlow(BaseBayesianOptimization):
         x0: np.ndarray,
         y0: np.ndarray,
         batch_size: int = 1,
-        num_chains: int = 10,
-        n_mh_steps: int = 100,
+        num_chains: int = 32,
+        n_mh_steps: int = 30,
         burn_in: int = 0, # 0 , 50
-        local_step_size: float = 0.4,
+        local_step_size: float = 0.15,
         local_proposal_weight: float = 0.5, # 0.3 , 0.5
-        pool_size: int = 128, # 256, 128
+        pool_size: int = 512, # 256, 128
         flow_training_steps: int = 50, # 100, 50
         flow_hidden_dim: int | None = None,
         flow_depth: int = 4, # 6, 4
@@ -279,6 +315,9 @@ class COWBOYSFlow(BaseBayesianOptimization):
         self._flow_is_initialized = False
         self.accepted_latent_history = torch.zeros((0, 0), device=self.device, dtype=self.dtype)
         self.last_sampling_diagnostics: dict[str, float | int] = {}
+        self.last_selected_candidates: list[dict[str, Any]] = []
+        self.pending_selected_candidates: list[dict[str, Any]] = []
+        self._last_reported_history_size = int(np.asarray(x0).shape[0])
 
     def _fit_model(
         self, model: type[SingleTaskGP], x: np.ndarray, y: np.ndarray
@@ -309,6 +348,7 @@ class COWBOYSFlow(BaseBayesianOptimization):
             raise ValueError("Need to pass in a generative model using `set_vae_and_bounds`.")
 
         observed_unit_latents, y = self.get_history_as_arrays()
+        self._report_pending_candidate_observations(observed_unit_latents, y)
         observed_latents = self._to_tensor(self._unit_to_latent(observed_unit_latents))
         y = np.asarray(y, dtype=float).reshape(-1, 1)
         best_score_so_far = (
@@ -345,12 +385,34 @@ class COWBOYSFlow(BaseBayesianOptimization):
             f"post_burn_samples={mh_result.sampled_latents.shape[0]}, "
             f"replay_buffer={self.accepted_latent_history.shape[0]}"
         )
+        print(
+            "proposal diagnostics: "
+            f"local_proposals={mh_result.proposal_diagnostics.n_local_proposals}, "
+            f"global_proposals={mh_result.proposal_diagnostics.n_global_proposals}, "
+            f"local_accepted={mh_result.proposal_diagnostics.n_local_accepted}, "
+            f"global_accepted={mh_result.proposal_diagnostics.n_global_accepted}, "
+            f"local_acceptance_rate={mh_result.proposal_diagnostics.local_acceptance_rate:.3f}, "
+            f"global_acceptance_rate={mh_result.proposal_diagnostics.global_acceptance_rate:.3f}, "
+            f"unique_local_proposed={mh_result.proposal_diagnostics.n_unique_local_proposed_structures}, "
+            f"unique_global_proposed={mh_result.proposal_diagnostics.n_unique_global_proposed_structures}, "
+            f"unique_local_accepted={mh_result.proposal_diagnostics.n_unique_local_accepted_structures}, "
+            f"unique_global_accepted={mh_result.proposal_diagnostics.n_unique_global_accepted_structures}"
+        )
 
-        selected_latents = self._select_candidates(
+        selected_latents, selected_candidate_metadata = self._select_candidates(
             mh_result.sampled_latents,
+            mh_result.sampled_sources,
             weighted_pool,
             bo_state,
         )
+        selected_candidate_metadata = self._build_selected_candidate_metadata(
+            selected_latents,
+            selected_candidate_metadata,
+            bo_state,
+        )
+        self._log_selected_candidates(selected_candidate_metadata)
+        self.last_selected_candidates = selected_candidate_metadata
+        self.pending_selected_candidates = [candidate.copy() for candidate in selected_candidate_metadata]
 
         self.last_sampling_diagnostics = {
             "acceptance_rate": mh_result.acceptance_rate,
@@ -358,8 +420,10 @@ class COWBOYSFlow(BaseBayesianOptimization):
             "num_pool_latents": int(weighted_pool.latents.shape[0]),
             "num_mh_samples": int(mh_result.sampled_latents.shape[0]),
             "num_replay_latents": int(self.accepted_latent_history.shape[0]),
+            **mh_result.proposal_diagnostics.to_dict(),
         }
 
+        self._last_reported_history_size = int(len(observed_unit_latents))
         return self._latent_to_unit(selected_latents.detach().cpu().numpy())
 
     def set_vae_and_bounds(self, vae: Any, vae_bounds: tuple[float, float]) -> None:
@@ -537,14 +601,32 @@ class COWBOYSFlow(BaseBayesianOptimization):
         current_log_target = self._evaluate_latent_target(current_states, bo_state).log_target
         accepted_latents: list[torch.Tensor] = []
         sampled_latents: list[torch.Tensor] = []
+        sampled_sources: list[str] = []
         total_accepts = 0
+        n_local_proposals = 0
+        n_global_proposals = 0
+        n_local_accepted = 0
+        n_global_accepted = 0
+        local_proposed_structures: set[str] = set()
+        global_proposed_structures: set[str] = set()
+        local_accepted_structures: set[str] = set()
+        global_accepted_structures: set[str] = set()
+        current_sources = ["initial"] * self.num_chains
         burn_in = min(self.burn_in, max(self.n_mh_steps - 1, 0))
 
         for step in range(self.n_mh_steps):
-            proposed_states = self.proposal.propose(current_states)
-            proposed_log_target = self._evaluate_latent_target(
-                proposed_states, bo_state
-            ).log_target
+            proposed_states, use_local = self.proposal.propose(current_states)
+            proposed_evaluation = self._evaluate_latent_target(proposed_states, bo_state)
+            proposed_log_target = proposed_evaluation.log_target
+            use_global = ~use_local
+            n_local_proposals += int(use_local.sum().item())
+            n_global_proposals += int(use_global.sum().item())
+            self._extend_structure_set(
+                local_proposed_structures, proposed_evaluation.structures, use_local
+            )
+            self._extend_structure_set(
+                global_proposed_structures, proposed_evaluation.structures, use_global
+            )
             log_q_forward = self.proposal.log_prob(proposed_states, current_states)
             log_q_reverse = self.proposal.log_prob(current_states, proposed_states)
             log_acceptance = proposed_log_target + log_q_reverse
@@ -570,14 +652,28 @@ class COWBOYSFlow(BaseBayesianOptimization):
                 current_log_target[accepted_indices] = proposed_log_target[accepted_indices]
                 accepted_latents.append(proposed_states[accepted_indices].detach().clone())
                 total_accepts += int(accepted_indices.numel())
+                accepted_local = accept & use_local
+                accepted_global = accept & use_global
+                n_local_accepted += int(accepted_local.sum().item())
+                n_global_accepted += int(accepted_global.sum().item())
+                self._extend_structure_set(
+                    local_accepted_structures, proposed_evaluation.structures, accepted_local
+                )
+                self._extend_structure_set(
+                    global_accepted_structures, proposed_evaluation.structures, accepted_global
+                )
+                for idx in accepted_indices.tolist():
+                    current_sources[idx] = "local" if bool(use_local[idx].item()) else "global"
 
             if step >= burn_in:
                 sampled_latents.append(current_states.detach().clone())
+                sampled_sources.extend(current_sources)
 
         if sampled_latents:
             stacked_samples = torch.cat(sampled_latents, dim=0)
         else:
             stacked_samples = current_states.detach().clone()
+            sampled_sources = current_sources.copy()
 
         if accepted_latents:
             stacked_accepts = torch.cat(accepted_latents, dim=0)
@@ -586,32 +682,51 @@ class COWBOYSFlow(BaseBayesianOptimization):
                 (0, current_states.shape[1]), device=self.device, dtype=self.dtype
             )
 
+        proposal_diagnostics = ProposalDiagnostics(
+            n_local_proposals=n_local_proposals,
+            n_global_proposals=n_global_proposals,
+            n_local_accepted=n_local_accepted,
+            n_global_accepted=n_global_accepted,
+            n_unique_local_proposed_structures=len(local_proposed_structures),
+            n_unique_global_proposed_structures=len(global_proposed_structures),
+            n_unique_local_accepted_structures=len(local_accepted_structures),
+            n_unique_global_accepted_structures=len(global_accepted_structures),
+        )
+
         return MHSamplingResult(
             sampled_latents=stacked_samples,
+            sampled_sources=sampled_sources,
             accepted_latents=stacked_accepts,
             acceptance_rate=total_accepts / max(self.n_mh_steps * self.num_chains, 1),
+            proposal_diagnostics=proposal_diagnostics,
         )
 
     def _select_candidates(
         self,
         sampled_latents: torch.Tensor,
+        sampled_sources: list[str],
         weighted_pool: WeightedLatentPool,
         bo_state: StructuredBOState,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, list[dict[str, str]]]:
         observed_structures = set(bo_state.observed_structures)
         candidate_latents = sampled_latents
 
         candidate_structures = self._decode_latents(candidate_latents)
         unique_latents: list[torch.Tensor] = []
-        unique_structures: list[str] = []
+        unique_metadata: list[dict[str, str]] = []
         seen_structures = set(observed_structures)
 
-        for latent, structure in zip(candidate_latents, candidate_structures):
+        for latent, structure, source in zip(candidate_latents, candidate_structures, sampled_sources):
             if structure in seen_structures:
                 continue
             seen_structures.add(structure)
             unique_latents.append(latent.unsqueeze(0))
-            unique_structures.append(structure)
+            unique_metadata.append(
+                {
+                    "source": source,
+                    "structure": structure,
+                }
+            )
 
         if len(unique_latents) < self.batch_size:
             pool_order = torch.argsort(weighted_pool.normalized_weights, descending=True)
@@ -621,20 +736,32 @@ class COWBOYSFlow(BaseBayesianOptimization):
                     continue
                 seen_structures.add(structure)
                 unique_latents.append(weighted_pool.latents[idx : idx + 1])
-                unique_structures.append(structure)
+                unique_metadata.append(
+                    {
+                        "source": "pool_fallback",
+                        "structure": structure,
+                    }
+                )
                 if len(unique_latents) >= self.batch_size:
                     break
 
         if not unique_latents:
             best_index = int(torch.argmax(weighted_pool.normalized_weights).item())
             fallback = weighted_pool.latents[best_index : best_index + 1]
-            return fallback
+            return fallback, [
+                {
+                    "source": "pool_fallback",
+                    "structure": weighted_pool.structures[best_index],
+                }
+            ]
 
         stacked_latents = torch.cat(unique_latents, dim=0)
         if stacked_latents.shape[0] <= self.batch_size:
-            return stacked_latents
+            return stacked_latents, unique_metadata
 
-        candidate_features = self._structures_to_feature_tensors(unique_structures)
+        candidate_features = self._structures_to_feature_tensors(
+            [candidate["structure"] for candidate in unique_metadata]
+        )
         acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
         chosen_features, _ = optimize_acqf_discrete(
             acquisition,
@@ -643,7 +770,7 @@ class COWBOYSFlow(BaseBayesianOptimization):
             max_batch_size=1_000,
         )
         chosen_indices = self._match_selected_features(candidate_features, chosen_features)
-        return stacked_latents[chosen_indices]
+        return stacked_latents[chosen_indices], [unique_metadata[idx].copy() for idx in chosen_indices]
 
     def _update_replay_buffer(self, accepted_latents: torch.Tensor) -> None:
         if accepted_latents.numel() == 0:
@@ -654,6 +781,107 @@ class COWBOYSFlow(BaseBayesianOptimization):
         if updated_buffer.shape[0] > max_buffer_size:
             updated_buffer = self._subsample_latents(updated_buffer, max_buffer_size)
         self.accepted_latent_history = updated_buffer.detach()
+
+    def _extend_structure_set(
+        self, destination: set[str], structures: list[str], mask: torch.Tensor
+    ) -> None:
+        if mask.numel() == 0 or not mask.any():
+            return
+
+        destination.update(structures[idx] for idx in torch.where(mask)[0].tolist())
+
+    def _build_selected_candidate_metadata(
+        self,
+        selected_latents: torch.Tensor,
+        selected_candidate_metadata: list[dict[str, str]],
+        bo_state: StructuredBOState,
+    ) -> list[dict[str, Any]]:
+        if selected_latents.numel() == 0:
+            return []
+
+        evaluation = self._evaluate_latent_target(selected_latents, bo_state)
+        selected_unit_latents = self._latent_to_unit(selected_latents.detach().cpu().numpy())
+        enriched_metadata: list[dict[str, Any]] = []
+
+        for idx, candidate in enumerate(selected_candidate_metadata):
+            enriched_metadata.append(
+                {
+                    **candidate,
+                    "structure": evaluation.structures[idx],
+                    "log_probability_of_improvement": float(
+                        evaluation.log_weight[idx].detach().cpu().item()
+                    ),
+                    "log_target": float(evaluation.log_target[idx].detach().cpu().item()),
+                    "latent": selected_latents[idx].detach().cpu().numpy().tolist(),
+                    "unit_latent": selected_unit_latents[idx].tolist(),
+                }
+            )
+
+        return enriched_metadata
+
+    def _log_selected_candidates(self, selected_candidates: list[dict[str, Any]]) -> None:
+        for idx, candidate in enumerate(selected_candidates):
+            print(
+                f"selected_candidate_{idx}: "
+                f"source={candidate['source']}, "
+                f"log_p_improvement={candidate['log_probability_of_improvement']:.3f}, "
+                f"log_target={candidate['log_target']:.3f} "
+                #f"structure={self._structure_preview(candidate['structure'])}"
+            )
+
+    def _report_pending_candidate_observations(
+        self, observed_unit_latents: np.ndarray, y: np.ndarray
+    ) -> None:
+        if not self.pending_selected_candidates:
+            self._last_reported_history_size = int(len(observed_unit_latents))
+            return
+
+        start_idx = min(self._last_reported_history_size, len(observed_unit_latents))
+        new_unit_latents = np.asarray(observed_unit_latents[start_idx:], dtype=float)
+        new_y = np.asarray(y, dtype=float).reshape(-1)[start_idx:]
+        matched_new_indices: set[int] = set()
+        remaining_candidates: list[dict[str, Any]] = []
+
+        for candidate in self.pending_selected_candidates:
+            matched_index = self._match_unit_latent(candidate["unit_latent"], new_unit_latents, matched_new_indices)
+            if matched_index is None:
+                remaining_candidates.append(candidate)
+                continue
+
+            matched_new_indices.add(matched_index)
+            observed_value = float(new_y[matched_index])
+            candidate["observed_value"] = observed_value
+            print(
+                "evaluated_candidate: "
+                f"source={candidate['source']}, "
+                f"observed_value={observed_value:.6g}"
+                #f"structure={self._structure_preview(candidate['structure'])}"
+            )
+
+        self.pending_selected_candidates = remaining_candidates
+        self._last_reported_history_size = int(len(observed_unit_latents))
+
+    def _match_unit_latent(
+        self,
+        unit_latent: list[float],
+        observed_unit_latents: np.ndarray,
+        excluded_indices: set[int],
+    ) -> int | None:
+        if observed_unit_latents.size == 0:
+            return None
+
+        target = np.asarray(unit_latent, dtype=float)
+        for idx, observed in enumerate(observed_unit_latents):
+            if idx in excluded_indices:
+                continue
+            if np.allclose(observed, target, atol=1e-10, rtol=1e-8):
+                return idx
+        return None
+
+    def _structure_preview(self, structure: str, max_length: int = 80) -> str:
+        if len(structure) <= max_length:
+            return structure
+        return f"{structure[: max_length - 3]}..."
 
     def _decode_latents(self, latents: torch.Tensor) -> list[str]:
         decoded = self.vae.decode_to_string_array(latents.detach().cpu().numpy())

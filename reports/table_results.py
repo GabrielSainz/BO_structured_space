@@ -1,3 +1,5 @@
+# python reports/table_results.py
+
 from pathlib import Path
 import re
 import numpy as np
@@ -69,14 +71,11 @@ def compute_npy_group_stats(folder):
     return results
 
 
-folder = "results/new_vae_10_chain_100_steps_with_stoch_sampling"
+folder = "results/new_vae_10_chain_100_steps_with_stoch_sampling_1"
 stats = compute_npy_group_stats(folder)
 
 for name, res in stats.items():
     print(f"\n{name}")
-    print("mean:")
-    print(res["mean"])
-    print("std:")
-    print(res["std"])
+    print(res['stacked'])
     print("mean ± std:")
     print(f"{res['mean']} ± {res['std']}")

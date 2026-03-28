@@ -27,6 +27,7 @@ SOLVER_NAMES = [
     "lambo2",
     "cowboys",
     "cowboys_flow",
+    "cowboys_flow_2",
 ]
 
 SOLVERS_THAT_DONT_ALLOW_CUSTOM_INPUTS = [
@@ -57,6 +58,7 @@ SOLVER_NAME_TO_ENV = {
     "turbo": "hdbo_benchmark",
     "cowboys": "hdbo_benchmark",
     "cowboys_flow": "hdbo_benchmark",
+    "cowboys_flow_2": "hdbo_benchmark",
     "vanilla_bo_hvarfner": "hdbo_ax",
     "alebo": "hdbo_alebo",
     "bounce": "hdbo_bounce",
@@ -261,6 +263,18 @@ def load_solver_class(
             return COWBOYS, solver_kwargs
         case "cowboys_flow":
             from cowboys_flow import COWBOYSFlow
+
+            torch.set_default_dtype(torch.float64)
+
+            solver_kwargs.update(
+                {
+                    "device": DEVICE,
+                }
+            )
+            return COWBOYSFlow, solver_kwargs
+
+        case "cowboys_flow_2":
+            from cowboys_flow_2 import COWBOYSFlow
 
             torch.set_default_dtype(torch.float64)
 
