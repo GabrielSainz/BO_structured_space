@@ -52,6 +52,13 @@ class StructuredBOState:
     observed_structures: list[str]
 
 
+@dataclass
+class DiffusionSamplingResult:
+    sampled_latents: torch.Tensor
+    num_rounds: int
+    num_unique: int
+
+
 class SafeLogExpectedImprovement(nn.Module):
     def __init__(self, model: SingleTaskGP, best_f: torch.Tensor, dtype: torch.dtype) -> None:
         super().__init__()
@@ -166,13 +173,29 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         observed_unit_latents, y = self.get_history_as_arrays()
         observed_latents = self._to_tensor(self._unit_to_latent(observed_unit_latents))
         y = np.asarray(y, dtype=float).reshape(-1, 1)
+        best_score_so_far = (
+            float(np.nanmax(y)) if np.isfinite(y).any() else self.penalize_nans_with
+        )
+        print(
+            f"collected at {len(observed_unit_latents)} points so far, "
+            f"with best score so far as {best_score_so_far}"
+        )
 
         bo_state = self._fit_structured_bo_state(observed_latents, y)
         if self.guide_mode == "distill":
             self._update_distill_critic(observed_latents, bo_state)
 
-        sampled_latents = self._sample_guided_latents(bo_state)
-        selected_latents = self._score_and_filter_candidates(sampled_latents, bo_state)
+        sampling_result = self._sample_guided_latents(bo_state)
+        print(
+            f"did {sampling_result.num_rounds} diffusion rounds "
+            f"({self.num_diffusion_steps} reverse steps each) and found "
+            f"{sampling_result.num_unique} unique"
+        )
+        selected_latents = self._score_and_filter_candidates(
+            sampling_result.sampled_latents,
+            bo_state,
+        )
+        self._log_selected_candidates(selected_latents, bo_state)
 
         return self._latent_to_unit(selected_latents.detach().cpu().numpy())
 
@@ -280,13 +303,18 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             lr=self._critic_learning_rate,
         )
 
-    def _sample_guided_latents(self, bo_state: StructuredBOState) -> torch.Tensor:
+    def _sample_guided_latents(
+        self,
+        bo_state: StructuredBOState,
+    ) -> DiffusionSamplingResult:
         assert self.diffusion_model is not None
         observed_structures = set(bo_state.observed_structures)
         guidance_fn = self._build_guidance_function(bo_state)
 
         sampled_batches: list[torch.Tensor] = []
+        num_rounds = 0
         for _ in range(self._max_sampling_rounds):
+            num_rounds += 1
             normalized_latents = self.diffusion_model.sample(
                 n_samples=self._sampling_batch_size,
                 device=self.device,
@@ -309,9 +337,17 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
                 )
                 >= max(self.num_candidates, self.batch_size)
             ):
-                return combined_latents
+                return DiffusionSamplingResult(
+                    sampled_latents=combined_latents,
+                    num_rounds=num_rounds,
+                    num_unique=self._count_unique_valid_structures(
+                        combined_latents,
+                        observed_structures,
+                    ),
+                )
 
         for _ in range(2):
+            num_rounds += 1
             normalized_latents = self.diffusion_model.sample(
                 n_samples=self._sampling_batch_size,
                 device=self.device,
@@ -325,7 +361,15 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
                 )
             )
 
-        return torch.cat(sampled_batches, dim=0)
+        combined_latents = torch.cat(sampled_batches, dim=0)
+        return DiffusionSamplingResult(
+            sampled_latents=combined_latents,
+            num_rounds=num_rounds,
+            num_unique=self._count_unique_valid_structures(
+                combined_latents,
+                observed_structures,
+            ),
+        )
 
     def _build_guidance_function(self, bo_state: StructuredBOState) -> Any:
         if self.guide_mode == "real":
@@ -451,6 +495,28 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         log_weight[~valid_mask] = self.min_log_value
         return log_weight, structures, fingerprints, valid_mask
 
+    def _log_selected_candidates(
+        self,
+        selected_latents: torch.Tensor,
+        bo_state: StructuredBOState,
+    ) -> None:
+        if selected_latents.numel() == 0:
+            print("selected_candidate: none")
+            return
+
+        log_weight, structures, _, valid_mask = self._evaluate_log_weight(
+            selected_latents,
+            bo_state,
+        )
+        for idx, structure in enumerate(structures):
+            validity = "valid" if bool(valid_mask[idx].item()) else "fallback_invalid"
+            print(
+                f"selected_candidate_{idx}: "
+                f"log_weight={float(log_weight[idx].item()):.3f}, "
+                f"status={validity}"
+                #f"structure={self._structure_preview(structure)}"
+            )
+
     def _latent_array_to_structure_list(self, latents: torch.Tensor) -> list[str]:
         decoded = self.vae.decode_to_string_array(latents.detach().cpu().numpy())
         return self._normalize_structure_array(decoded)
@@ -522,6 +588,11 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             seen_structures.add(structure)
             n_unique += 1
         return n_unique
+
+    def _structure_preview(self, structure: str, max_length: int = 80) -> str:
+        if len(structure) <= max_length:
+            return structure
+        return f"{structure[: max_length - 3]}..."
 
     def _match_selected_features(
         self,
