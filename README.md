@@ -24,7 +24,7 @@ For the PMO tasks used by `run.py`, install the extra chemistry/runtime dependen
 
 ```bash
 conda install -c conda-forge "rdkit<2024.03" -y
-python -m pip install --upgrade huggingface_hub
+python -m pip install --upgrade PyTDC huggingface_hub
 ```
 
 These two quick checks should work before you launch the benchmark:
@@ -84,6 +84,11 @@ The repository also contains separate post-processing scripts under `src/hdbo_be
 
 Colab can work, but it is less reliable than a local Conda environment because the PMO stack depends on chemistry packages and TDC/poli integrations.
 
+The PMO tasks in this repo need `tdc` available in the active Python
+environment. On pip, that package is distributed as `PyTDC`. If `tdc` is
+missing, `poli` falls back to a Conda-based isolation path, which is exactly
+the failure mode you see on Colab.
+
 Suggested Colab workflow:
 
 ```python
@@ -91,7 +96,7 @@ Suggested Colab workflow:
 %cd ROTLSC
 !python -m pip install --upgrade pip
 !python -m pip install -r requirements.txt
-!python -m pip install gauche selfies huggingface_hub
+!python -m pip install gauche selfies PyTDC huggingface_hub
 !python -m pip install "rdkit<2024.03"
 !python -m pip install -e .
 ```
@@ -100,6 +105,13 @@ Then run:
 
 ```python
 !python run.py --function-name albuterol_similarity --solver-name cowboys --n-dimensions 128 --max-iter 300 --seed 1 --no-strict-on-hash --wandb-mode disabled --tag colab-test
+```
+
+Before launching the benchmark, these checks should pass:
+
+```python
+!python -c "import rdkit; print(rdkit.__version__)"
+!python -c "from tdc import Oracle; print('tdc ok')"
 ```
 
 If Colab dependency resolution fails, prefer a Linux or Windows Conda environment instead. For reproducibility, the local Conda route is the recommended one.

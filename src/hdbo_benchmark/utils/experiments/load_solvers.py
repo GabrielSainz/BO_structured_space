@@ -26,6 +26,7 @@ SOLVER_NAMES = [
     "saas_bo",
     "lambo2",
     "cowboys",
+    "cowboys_diffusion",
     "cowboys_flow",
     "cowboys_flow_2",
 ]
@@ -57,6 +58,7 @@ SOLVER_NAME_TO_ENV = {
     "baxus": "hdbo_baxus",
     "turbo": "hdbo_benchmark",
     "cowboys": "hdbo_benchmark",
+    "cowboys_diffusion": "hdbo_benchmark",
     "cowboys_flow": "hdbo_benchmark",
     "cowboys_flow_2": "hdbo_benchmark",
     "vanilla_bo_hvarfner": "hdbo_ax",
@@ -261,6 +263,17 @@ def load_solver_class(
                 }
             )
             return COWBOYS, solver_kwargs
+        case "cowboys_diffusion":
+            from hdbo_benchmark.solvers.cowboys_diffusion import COWBOYSDiffusion
+
+            torch.set_default_dtype(torch.float64)
+
+            solver_kwargs.update(
+                {
+                    "device": DEVICE,
+                }
+            )
+            return COWBOYSDiffusion, solver_kwargs
         case "cowboys_flow":
             from cowboys_flow import COWBOYSFlow
 

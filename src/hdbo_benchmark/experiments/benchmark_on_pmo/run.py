@@ -32,6 +32,7 @@ from hdbo_benchmark.utils.logging.idempotence_of_experiments import (
 )
 from hdbo_benchmark.utils.logging.uncommited_changes import has_uncommitted_changes
 from hdbo_benchmark.utils.logging.wandb_observer import initialize_observer
+from hdbo_benchmark.utils.tdc_compat import ensure_tdc_is_available
 
 torch.set_default_dtype(torch.float32)
 
@@ -123,6 +124,7 @@ def main(
     torch.manual_seed(seed)
 
     # 2. Load a black box and solver
+    ensure_tdc_is_available()
     problem = poli.create(
         name=function_name,
         string_representation="SELFIES",
@@ -201,7 +203,7 @@ def main(
         y0=y0,
         **kwargs,
     )
-z
+
     # 3. Optimize
     try:
         solver.solve(max_iter=max_iter)

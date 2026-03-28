@@ -17,6 +17,9 @@ from poli.core.data_package import DataPackage
 from hdbo_benchmark.utils.experiments.load_generative_models import (
     load_generative_model_and_bounds,
 )
+from hdbo_benchmark.generative_models.latent_diffusion import (
+    resolve_default_latent_diffusion_checkpoint,
+)
 from hdbo_benchmark.utils.experiments.load_problems import load_problem
 from hdbo_benchmark.utils.experiments.load_solvers import (
     CONTINUOUS_SPACE_SOLVERS,
@@ -46,6 +49,7 @@ def _main(
     wandb_mode: str,
     tag: str,    
     sufix: str,
+    diffusion_checkpoint_path: str | None,
 ):
     # Defining a unique experiment id
     experiment_id = f"{uuid4()}"
@@ -137,6 +141,13 @@ def _main(
         solver.set_vae_and_bounds(generative_model, bounds)
         solver.bounds = bounds
         assert solver._given_vae
+        if hasattr(solver, "load_diffusion_model_from_checkpoint"):
+            checkpoint_path = (
+                Path(diffusion_checkpoint_path)
+                if diffusion_checkpoint_path is not None
+                else resolve_default_latent_diffusion_checkpoint(n_dimensions)
+            )
+            solver.load_diffusion_model_from_checkpoint(checkpoint_path)
 
     # 3. Optimize
     try:
@@ -171,6 +182,7 @@ def _main(
 @click.option("--wandb-mode", type=str, default="disabled")
 @click.option("--tag", type=str, default="default")
 @click.option("--sufix", type=str, default="default")
+@click.option("--diffusion-checkpoint-path", type=str, default=None)
 def main(
     function_name: str,
     solver_name: str,
@@ -182,6 +194,7 @@ def main(
     wandb_mode: str,
     tag: str,
     sufix: str,
+    diffusion_checkpoint_path: str | None,
 ):
     _main(
         function_name,
@@ -193,7 +206,8 @@ def main(
         force_run,
         wandb_mode,
         tag,
-        sufix
+        sufix,
+        diffusion_checkpoint_path,
     )
 
 

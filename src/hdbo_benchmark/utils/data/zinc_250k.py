@@ -1,4 +1,4 @@
-"""Utilities for loading the Zinc 250k dataset"""
+"""Utilities for loading the Zinc 250k dataset."""
 
 import json
 from pathlib import Path
@@ -13,35 +13,57 @@ from hdbo_benchmark.utils.constants import DEVICE
 ROOT_DIR = Path(__file__).parent.parent.parent.parent.parent.resolve()
 
 
-def load_zinc_250k_dataset() -> np.ndarray:
+def resolve_zinc_250k_processed_dir(dataset_root: str | Path | None = None) -> Path:
+    if dataset_root is None:
+        return ROOT_DIR / "data" / "small_molecule_datasets" / "processed"
+
+    candidate = Path(dataset_root)
+    if candidate.name == "processed":
+        return candidate
+    if candidate.name == "small_molecule_datasets":
+        return candidate / "processed"
+    return candidate / "small_molecule_datasets" / "processed"
+
+
+def resolve_zinc_250k_dataset_path(dataset_root: str | Path | None = None) -> Path:
+    processed_dir = resolve_zinc_250k_processed_dir(dataset_root)
+    dataset_path = processed_dir / "zinc250k_onehot_and_integers.npz"
+    if not dataset_path.exists():
+        raise FileNotFoundError(
+            "Could not find the processed Zinc250k tensor dataset at "
+            f"{dataset_path}. Run the Zinc preprocessing pipeline first."
+        )
+
+    return dataset_path
+
+
+def load_zinc_250k_dataset(dataset_root: str | Path | None = None) -> np.ndarray:
     """Returns the small molecule dataset of one-hot encoded SELFIES strings.
 
     Using the alphabet computed during preprocessing, this method
     loads the dataset of SELFIES strings, and one-hot encodes them.
     """
-    dataset_path = (
-        ROOT_DIR
-        / "data"
-        / "small_molecule_datasets"
-        / "processed"
-        / "zinc250k_onehot_and_integers.npz"
-    )
+    dataset_path = resolve_zinc_250k_dataset_path(dataset_root)
     dataset_onehot: np.ndarray = np.load(dataset_path)["onehot"]
 
     return dataset_onehot
 
 
-def load_zinc_250k_alphabet() -> Dict[str, int]:
+def load_zinc_250k_alphabet(dataset_root: str | Path | None = None) -> Dict[str, int]:
     """
     Returns the alphabet (dict[str, int]) of SELFIES characters.
     """
-    alphabet_path = (
-        ROOT_DIR
-        / "data"
-        / "small_molecule_datasets"
-        / "processed"
-        / "alphabet_stoi.json"
-    )
+    processed_dir = resolve_zinc_250k_processed_dir(dataset_root)
+    candidate_paths = [
+        processed_dir / "zinc250k_alphabet_stoi.json",
+        processed_dir / "alphabet_stoi.json",
+    ]
+    alphabet_path = next((path for path in candidate_paths if path.exists()), None)
+    if alphabet_path is None:
+        raise FileNotFoundError(
+            "Could not find the processed Zinc250k alphabet JSON in "
+            f"{processed_dir}."
+        )
 
     with open(alphabet_path, "r") as f:
         alphabet: dict[str, int] = json.load(f)
@@ -55,6 +77,7 @@ def load_zinc_250k_dataloaders(
     batch_size: int = 256,
     overfit_to_a_single_batch: bool = False,
     device: torch.device = DEVICE,
+    dataset_root: str | Path | None = None,
 ) -> Tuple[DataLoader, DataLoader]:
     """
     Returns a train-test split for the Zinc 250k dataset.
@@ -62,7 +85,7 @@ def load_zinc_250k_dataloaders(
     numpy, and the dataloaders have shuffling turned on.
     """
     # Loading the one-hot representation
-    one_hot_molecules = load_zinc_250k_dataset()
+    one_hot_molecules = load_zinc_250k_dataset(dataset_root=dataset_root)
 
     # Shuffling according to the seed provided
     np.random.seed(random_seed)

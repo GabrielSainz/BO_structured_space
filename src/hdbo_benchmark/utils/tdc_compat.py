@@ -7,6 +7,23 @@ import types
 from pathlib import Path
 
 
+def ensure_tdc_is_available() -> None:
+    """Raise a helpful error before poli falls back to Conda isolation.
+
+    PMO tasks import `tdc` directly in-process when it is available. If it is
+    missing, poli tries a Conda-based fallback that is confusing on systems
+    such as Colab where Conda is not present.
+    """
+
+    if importlib.util.find_spec("tdc") is None:
+        raise RuntimeError(
+            "PMO tasks require the `tdc` module in the active Python "
+            "environment. Install it with "
+            '`python -m pip install PyTDC huggingface_hub "rdkit<2024.03"` '
+            'or install this repo with `python -m pip install -e ".[tdc]"`.'
+        )
+
+
 def patch_broken_tdc_chem_utils() -> None:
     """Work around broken `tdc.chem_utils` package exports.
 
