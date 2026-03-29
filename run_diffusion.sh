@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-for i in {2..5}
+for i in {3..5}
 do
     python run.py --function-name albuterol_similarity --solver-name cowboys_diffusion --n-dimensions 128 --max-iter 300 --seed $i --diffusion-checkpoint-path "data/trained_models/training_diffusion_on_zinc_250k/latent_diffusion_latent_dim-128-seed-0.pt" --num-diffusion-steps 200 --num-candidates 1000 --guidance-scale 10 --clip-guidance 30 --no-strict-on-hash --tag diffusion-test --sufix colab-diffusion
 

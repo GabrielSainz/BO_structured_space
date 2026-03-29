@@ -43,9 +43,6 @@ class WandbObserver(AbstractObserver):
     def __init__(
         self, project_name: str | None = None, allow_reinit: bool = False
     ) -> None:
-        # Log into wandb
-        wandb.login()
-
         # Some variables to keep track of the run
         self.best_y = -float("inf")
         self.run = None
@@ -62,6 +59,9 @@ class WandbObserver(AbstractObserver):
         mode: Literal["online", "offline", "disabled"] = "online",
         **kwargs,
     ) -> object:
+        if mode == "online":
+            wandb.login()
+
         run_name = f"{caller_info.experiment_name}-{caller_info.solver_name}-{caller_info.function_name}-n_dimensions-{caller_info.n_dimensions}-seed-{seed}"
         run = wandb.init(
             project=self.project_name if self.project_name else WANDB_PROJECT,
