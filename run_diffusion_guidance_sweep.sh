@@ -40,7 +40,6 @@ for combo in "${COMBINATIONS[@]}"; do
     --guidance-scale "${guidance_scale}" \
     --clip-guidance "${clip_guidance}" \
     --no-strict-on-hash \
-    --wandb-mode disabled \
     --tag diffusion-guidance-sweep \
     --sufix seed1-guidance-sweep
   then
