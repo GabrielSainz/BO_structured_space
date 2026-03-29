@@ -137,6 +137,9 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         self._max_sampling_rounds = 8
         self._real_guidance_directions = 4
         self._real_guidance_step_size = 0.15
+        self.last_selected_candidates: list[dict[str, Any]] = []
+        self.pending_selected_candidates: list[dict[str, Any]] = []
+        self._last_reported_history_size = int(np.asarray(x0).shape[0])
 
     def _fit_model(
         self,
@@ -175,6 +178,7 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             )
 
         observed_unit_latents, y = self.get_history_as_arrays()
+        self._report_pending_candidate_observations(observed_unit_latents, y)
         observed_latents = self._to_tensor(self._unit_to_latent(observed_unit_latents))
         y = np.asarray(y, dtype=float).reshape(-1, 1)
         best_score_so_far = (
@@ -199,7 +203,16 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             sampling_result.sampled_latents,
             bo_state,
         )
-        self._log_selected_candidates(selected_latents, bo_state)
+        selected_candidate_metadata = self._build_selected_candidate_metadata(
+            selected_latents,
+            bo_state,
+        )
+        self._log_selected_candidates(selected_candidate_metadata)
+        self.last_selected_candidates = selected_candidate_metadata
+        self.pending_selected_candidates = [
+            candidate.copy() for candidate in selected_candidate_metadata
+        ]
+        self._last_reported_history_size = int(len(observed_unit_latents))
 
         return self._latent_to_unit(selected_latents.detach().cpu().numpy())
 
@@ -499,27 +512,86 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         log_weight[~valid_mask] = self.min_log_value
         return log_weight, structures, fingerprints, valid_mask
 
-    def _log_selected_candidates(
+    def _build_selected_candidate_metadata(
         self,
         selected_latents: torch.Tensor,
         bo_state: StructuredBOState,
-    ) -> None:
+    ) -> list[dict[str, Any]]:
         if selected_latents.numel() == 0:
-            print("selected_candidate: none")
-            return
+            return []
 
         log_weight, structures, _, valid_mask = self._evaluate_log_weight(
             selected_latents,
             bo_state,
         )
+        selected_unit_latents = self._latent_to_unit(selected_latents.detach().cpu().numpy())
+        selected_candidates: list[dict[str, Any]] = []
+
         for idx, structure in enumerate(structures):
             validity = "valid" if bool(valid_mask[idx].item()) else "fallback_invalid"
+            selected_candidates.append(
+                {
+                    "structure": structure,
+                    "status": validity,
+                    "log_weight": float(log_weight[idx].detach().cpu().item()),
+                    "latent": selected_latents[idx].detach().cpu().numpy().tolist(),
+                    "unit_latent": selected_unit_latents[idx].tolist(),
+                }
+            )
+
+        return selected_candidates
+
+    def _log_selected_candidates(self, selected_candidates: list[dict[str, Any]]) -> None:
+        if not selected_candidates:
+            print("selected_candidate: none")
+            return
+
+        for idx, candidate in enumerate(selected_candidates):
             print(
                 f"selected_candidate_{idx}: "
-                f"log_weight={float(log_weight[idx].item()):.3f}, "
-                f"status={validity}"
-                #f"structure={self._structure_preview(structure)}"
+                f"log_weight={candidate['log_weight']:.3f}, "
+                f"status={candidate['status']}"
+                #f"structure={self._structure_preview(candidate['structure'])}"
             )
+
+    def _report_pending_candidate_observations(
+        self,
+        observed_unit_latents: np.ndarray,
+        y: np.ndarray,
+    ) -> None:
+        if not self.pending_selected_candidates:
+            self._last_reported_history_size = int(len(observed_unit_latents))
+            return
+
+        start_idx = min(self._last_reported_history_size, len(observed_unit_latents))
+        new_unit_latents = np.asarray(observed_unit_latents[start_idx:], dtype=float)
+        new_y = np.asarray(y, dtype=float).reshape(-1)[start_idx:]
+        matched_new_indices: set[int] = set()
+        remaining_candidates: list[dict[str, Any]] = []
+
+        for candidate in self.pending_selected_candidates:
+            matched_index = self._match_unit_latent(
+                candidate["unit_latent"],
+                new_unit_latents,
+                matched_new_indices,
+            )
+            if matched_index is None:
+                remaining_candidates.append(candidate)
+                continue
+
+            matched_new_indices.add(matched_index)
+            observed_value = float(new_y[matched_index])
+            candidate["observed_value"] = observed_value
+            print(
+                "evaluated_candidate: "
+                f"observed_value={observed_value:.6g}, "
+                f"log_weight={candidate['log_weight']:.3f}, "
+                f"status={candidate['status']}"
+                #f"structure={self._structure_preview(candidate['structure'])}"
+            )
+
+        self.pending_selected_candidates = remaining_candidates
+        self._last_reported_history_size = int(len(observed_unit_latents))
 
     def _latent_array_to_structure_list(self, latents: torch.Tensor) -> list[str]:
         decoded = self.vae.decode_to_string_array(latents.detach().cpu().numpy())
@@ -597,6 +669,23 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         if len(structure) <= max_length:
             return structure
         return f"{structure[: max_length - 3]}..."
+
+    def _match_unit_latent(
+        self,
+        unit_latent: list[float],
+        observed_unit_latents: np.ndarray,
+        excluded_indices: set[int],
+    ) -> int | None:
+        if observed_unit_latents.size == 0:
+            return None
+
+        target = np.asarray(unit_latent, dtype=float)
+        for idx, observed in enumerate(observed_unit_latents):
+            if idx in excluded_indices:
+                continue
+            if np.allclose(observed, target, atol=1e-10, rtol=1e-8):
+                return idx
+        return None
 
     def _match_selected_features(
         self,
