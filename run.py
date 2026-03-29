@@ -78,6 +78,7 @@ def _main(
     diffusion_checkpoint_path: str | None,
     num_diffusion_steps: int | None,
     num_candidates: int | None,
+    distillation_n: int | None,
     guidance_scale: float | None,
     clip_guidance: float | None,
 ):
@@ -162,6 +163,8 @@ def _main(
             diffusion_solver_kwargs["num_diffusion_steps"] = num_diffusion_steps
         if num_candidates is not None:
             diffusion_solver_kwargs["num_candidates"] = num_candidates
+        if distillation_n is not None:
+            diffusion_solver_kwargs["distillation_n"] = distillation_n
         if guidance_scale is not None:
             diffusion_solver_kwargs["guidance_scale"] = guidance_scale
         if clip_guidance is not None:
@@ -203,6 +206,7 @@ def _main(
         "guide_mode": getattr(solver, "guide_mode", None),
         "num_diffusion_steps": getattr(solver, "num_diffusion_steps", None),
         "num_candidates": getattr(solver, "num_candidates", None),
+        "distillation_n": getattr(solver, "distillation_n", None),
         "guidance_scale": getattr(solver, "guidance_scale", None),
         "clip_guidance": getattr(solver, "clip_guidance", None),
     }
@@ -238,6 +242,7 @@ def _main(
 @click.option("--diffusion-checkpoint-path", type=str, default=None)
 @click.option("--num-diffusion-steps", type=int, default=None)
 @click.option("--num-candidates", type=int, default=None)
+@click.option("--distillation-n", type=int, default=None)
 @click.option("--guidance-scale", type=float, default=None)
 @click.option("--clip-guidance", type=float, default=None)
 def main(
@@ -254,6 +259,7 @@ def main(
     diffusion_checkpoint_path: str | None,
     num_diffusion_steps: int | None,
     num_candidates: int | None,
+    distillation_n: int | None,
     guidance_scale: float | None,
     clip_guidance: float | None,
 ):
@@ -271,6 +277,7 @@ def main(
         diffusion_checkpoint_path,
         num_diffusion_steps,
         num_candidates,
+        distillation_n,
         guidance_scale,
         clip_guidance,
     )

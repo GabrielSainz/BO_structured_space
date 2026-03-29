@@ -96,6 +96,7 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         guide_mode: str = "distill",
         weight_type: str = "pi",
         num_candidates: int = 1000,
+        distillation_n: int = 1024,
         num_diffusion_steps: int = 100,
         guidance_scale: float = 1.0,
         clip_guidance: float = 1.0,
@@ -105,6 +106,8 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             raise ValueError("guide_mode must be either 'real' or 'distill'.")
         if weight_type not in {"pi", "ei"}:
             raise ValueError("weight_type must be either 'pi' or 'ei'.")
+        if distillation_n <= 0:
+            raise ValueError("distillation_n must be a positive integer.")
 
         self.device = device
         self.dtype = torch.float64
@@ -112,6 +115,7 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         self.guide_mode = guide_mode
         self.weight_type = weight_type
         self.num_candidates = num_candidates
+        self.distillation_n = distillation_n
         self.num_diffusion_steps = num_diffusion_steps
         self.guidance_scale = guidance_scale
         self.clip_guidance = clip_guidance
@@ -126,10 +130,10 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         self.critic_optimizer: torch.optim.Optimizer | None = None
         self._critic_learning_rate = 1e-3
         self._critic_steps = 64
-        self._critic_batch_size = max(32, 2 * num_candidates)
-        self._critic_aux_samples = max(32, 2 * num_candidates)
+        self._critic_batch_size = max(32, self.distillation_n)
+        self._critic_aux_samples = self.distillation_n
 
-        self._sampling_batch_size = max(self.num_candidates, 4 * self.batch_size)
+        self._sampling_batch_size = max(self.num_candidates, self.batch_size)
         self._max_sampling_rounds = 8
         self._real_guidance_directions = 4
         self._real_guidance_step_size = 0.15
@@ -335,7 +339,7 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
                     combined_latents,
                     observed_structures,
                 )
-                >= max(self.num_candidates, self.batch_size)
+                >= self.batch_size
             ):
                 return DiffusionSamplingResult(
                     sampled_latents=combined_latents,
