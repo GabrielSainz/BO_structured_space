@@ -202,10 +202,13 @@ class LatentDiffusionModel(nn.Module):
         self,
         n_samples: int,
         device: torch.device | None = None,
-        num_steps: int | None = None,
         guidance_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
         guidance_scale: float = 1.0,
         clip_guidance: float | None = None,
+        guide_every: int = 1,
+        guidance_alpha_bar_lower: float = 1e-4,
+        guidance_alpha_bar_upper: float = 0.999,
+        eta: float = 0.0,
         initial_noise: torch.Tensor | None = None,
     ) -> torch.Tensor:
         device = device or self.z_mean.device
@@ -215,7 +218,7 @@ class LatentDiffusionModel(nn.Module):
         else:
             current = initial_noise.to(device=device, dtype=dtype)
 
-        schedule = self.build_sampling_schedule(num_steps=num_steps)
+        schedule = self.build_sampling_schedule()
         for step_idx, timestep in enumerate(schedule):
             prev_timestep = schedule[step_idx + 1] if step_idx + 1 < len(schedule) else -1
             timestep_batch = torch.full(
@@ -232,20 +235,59 @@ class LatentDiffusionModel(nn.Module):
                     predicted_noise,
                 )
 
-            if guidance_fn is not None and guidance_scale != 0.0:
+            guided_noise = predicted_noise
+            alpha_bar_t = self.alpha_bars[timestep]
+            alpha_bar_float = float(alpha_bar_t.item())
+            do_guide = (
+                guidance_fn is not None
+                and guidance_scale != 0.0
+                and timestep % max(1, guide_every) == 0
+                and guidance_alpha_bar_lower < alpha_bar_float < guidance_alpha_bar_upper
+            )
+            if do_guide:
+                # We approximate g_t = grad_{z_t} log w(h(\hat z_0(z_t)))
+                # with (1 / sqrt(alpha_bar_t)) * grad_{\hat z_0} log w(h(\hat z_0)),
+                # ignoring the epsilon-network Jacobian as in plug-in guidance schemes.
+                sqrt_alpha_bar = _extract(self.sqrt_alpha_bars, timestep_batch, current.shape)
+                sqrt_one_minus = _extract(
+                    self.sqrt_one_minus_alpha_bars,
+                    timestep_batch,
+                    current.shape,
+                )
                 guidance = guidance_fn(predicted_start.detach())
                 guidance = torch.nan_to_num(guidance, nan=0.0, posinf=0.0, neginf=0.0)
+                guidance = guidance / sqrt_alpha_bar.clamp_min(1e-12)
                 guidance = self._clip_guidance(guidance, clip_guidance)
-                predicted_start = predicted_start + guidance_scale * guidance
+                guided_noise = predicted_noise - guidance_scale * sqrt_one_minus * guidance
+                predicted_start = self.predict_start_from_noise(
+                    current,
+                    timestep_batch,
+                    guided_noise,
+                )
 
             if prev_timestep < 0:
                 current = predicted_start
                 continue
 
             alpha_bar_prev = self.alpha_bars[prev_timestep]
-            current = torch.sqrt(alpha_bar_prev.clamp_min(1e-12)) * predicted_start + torch.sqrt(
-                (1.0 - alpha_bar_prev).clamp_min(0.0)
-            ) * predicted_noise
+            sigma = eta * torch.sqrt(
+                ((1.0 - alpha_bar_prev) / (1.0 - alpha_bar_t).clamp_min(1e-12)).clamp_min(0.0)
+            ) * torch.sqrt(
+                (1.0 - (alpha_bar_t / alpha_bar_prev.clamp_min(1e-12))).clamp_min(0.0)
+            )
+            deterministic_scale = torch.sqrt(
+                (1.0 - alpha_bar_prev - sigma.pow(2)).clamp_min(0.0)
+            )
+            noise = (
+                torch.randn_like(current)
+                if eta > 0.0
+                else torch.zeros_like(current)
+            )
+            current = (
+                torch.sqrt(alpha_bar_prev.clamp_min(1e-12)) * predicted_start
+                + deterministic_scale * guided_noise
+                + sigma * noise
+            )
 
         return current
 

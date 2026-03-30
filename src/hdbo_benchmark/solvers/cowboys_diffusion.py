@@ -97,9 +97,12 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         weight_type: str = "pi",
         num_candidates: int = 1000,
         distillation_n: int = 1024,
-        num_diffusion_steps: int = 100,
         guidance_scale: float = 1.0,
         clip_guidance: float = 1.0,
+        guide_every: int = 1,
+        guidance_alpha_bar_lower: float = 1e-4,
+        guidance_alpha_bar_upper: float = 0.999,
+        eta: float = 0.0,
     ) -> None:
         super().__init__(black_box, x0, y0)
         if guide_mode not in {"real", "distill"}:
@@ -108,6 +111,15 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             raise ValueError("weight_type must be either 'pi' or 'ei'.")
         if distillation_n <= 0:
             raise ValueError("distillation_n must be a positive integer.")
+        if eta < 0.0:
+            raise ValueError("eta must be non-negative.")
+        if guide_every <= 0:
+            raise ValueError("guide_every must be a positive integer.")
+        if not 0.0 <= guidance_alpha_bar_lower < guidance_alpha_bar_upper <= 1.0:
+            raise ValueError(
+                "guidance_alpha_bar_lower and guidance_alpha_bar_upper must satisfy "
+                "0 <= lower < upper <= 1."
+            )
 
         self.device = device
         self.dtype = torch.float64
@@ -116,9 +128,12 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         self.weight_type = weight_type
         self.num_candidates = num_candidates
         self.distillation_n = distillation_n
-        self.num_diffusion_steps = num_diffusion_steps
         self.guidance_scale = guidance_scale
         self.clip_guidance = clip_guidance
+        self.guide_every = guide_every
+        self.guidance_alpha_bar_lower = guidance_alpha_bar_lower
+        self.guidance_alpha_bar_upper = guidance_alpha_bar_upper
+        self.eta = eta
         self.penalize_nans_with = penalize_nans_with
         self.min_log_value = -1e8
 
@@ -194,9 +209,12 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             self._update_distill_critic(observed_latents, bo_state)
 
         sampling_result = self._sample_guided_latents(bo_state)
+        total_reverse_steps = int(self.diffusion_model.config.T) if self.diffusion_model is not None else -1
         print(
             f"did {sampling_result.num_rounds} diffusion rounds "
-            f"({self.num_diffusion_steps} reverse steps each) and found "
+            f"({total_reverse_steps} reverse steps each, guide_every={self.guide_every}, "
+            f"alpha_bar in ({self.guidance_alpha_bar_lower:g}, {self.guidance_alpha_bar_upper:g})) "
+            f"and found "
             f"{sampling_result.num_unique} unique"
         )
         selected_latents = self._score_and_filter_candidates(
@@ -335,10 +353,13 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             normalized_latents = self.diffusion_model.sample(
                 n_samples=self._sampling_batch_size,
                 device=self.device,
-                num_steps=self.num_diffusion_steps,
                 guidance_fn=guidance_fn,
                 guidance_scale=self.guidance_scale,
                 clip_guidance=self.clip_guidance,
+                guide_every=self.guide_every,
+                guidance_alpha_bar_lower=self.guidance_alpha_bar_lower,
+                guidance_alpha_bar_upper=self.guidance_alpha_bar_upper,
+                eta=self.eta,
             )
             sampled_batches.append(
                 self.diffusion_model.unnormalize_latents(normalized_latents).to(
@@ -368,8 +389,11 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             normalized_latents = self.diffusion_model.sample(
                 n_samples=self._sampling_batch_size,
                 device=self.device,
-                num_steps=self.num_diffusion_steps,
                 guidance_fn=None,
+                guide_every=self.guide_every,
+                guidance_alpha_bar_lower=self.guidance_alpha_bar_lower,
+                guidance_alpha_bar_upper=self.guidance_alpha_bar_upper,
+                eta=self.eta,
             )
             sampled_batches.append(
                 self.diffusion_model.unnormalize_latents(normalized_latents).to(

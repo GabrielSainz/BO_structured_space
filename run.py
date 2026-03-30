@@ -76,11 +76,14 @@ def _main(
     tag: str,    
     sufix: str,
     diffusion_checkpoint_path: str | None,
-    num_diffusion_steps: int | None,
     num_candidates: int | None,
     distillation_n: int | None,
     guidance_scale: float | None,
     clip_guidance: float | None,
+    guide_every: int | None,
+    guidance_alpha_bar_lower: float | None,
+    guidance_alpha_bar_upper: float | None,
+    diffusion_eta: float | None,
 ):
     # Defining a unique experiment id
     experiment_id = f"{uuid4()}"
@@ -159,8 +162,6 @@ def _main(
     # load the solver
     diffusion_solver_kwargs = {}
     if solver_name == "cowboys_diffusion":
-        if num_diffusion_steps is not None:
-            diffusion_solver_kwargs["num_diffusion_steps"] = num_diffusion_steps
         if num_candidates is not None:
             diffusion_solver_kwargs["num_candidates"] = num_candidates
         if distillation_n is not None:
@@ -169,6 +170,14 @@ def _main(
             diffusion_solver_kwargs["guidance_scale"] = guidance_scale
         if clip_guidance is not None:
             diffusion_solver_kwargs["clip_guidance"] = clip_guidance
+        if guide_every is not None:
+            diffusion_solver_kwargs["guide_every"] = guide_every
+        if guidance_alpha_bar_lower is not None:
+            diffusion_solver_kwargs["guidance_alpha_bar_lower"] = guidance_alpha_bar_lower
+        if guidance_alpha_bar_upper is not None:
+            diffusion_solver_kwargs["guidance_alpha_bar_upper"] = guidance_alpha_bar_upper
+        if diffusion_eta is not None:
+            diffusion_solver_kwargs["eta"] = diffusion_eta
 
     solver = load_solver_from_problem(
         solver_name=solver_name,
@@ -204,11 +213,14 @@ def _main(
 
     diffusion_config_for_path = {
         "guide_mode": getattr(solver, "guide_mode", None),
-        "num_diffusion_steps": getattr(solver, "num_diffusion_steps", None),
         "num_candidates": getattr(solver, "num_candidates", None),
         "distillation_n": getattr(solver, "distillation_n", None),
         "guidance_scale": getattr(solver, "guidance_scale", None),
         "clip_guidance": getattr(solver, "clip_guidance", None),
+        "guide_every": getattr(solver, "guide_every", None),
+        "guidance_alpha_bar_lower": getattr(solver, "guidance_alpha_bar_lower", None),
+        "guidance_alpha_bar_upper": getattr(solver, "guidance_alpha_bar_upper", None),
+        "eta": getattr(solver, "eta", None),
     }
     output_dir = _build_output_dir(
         solver_name=solver_name,
@@ -240,11 +252,14 @@ def _main(
 @click.option("--tag", type=str, default="default")
 @click.option("--sufix", type=str, default="default")
 @click.option("--diffusion-checkpoint-path", type=str, default=None)
-@click.option("--num-diffusion-steps", type=int, default=None)
 @click.option("--num-candidates", type=int, default=None)
 @click.option("--distillation-n", type=int, default=None)
 @click.option("--guidance-scale", type=float, default=None)
 @click.option("--clip-guidance", type=float, default=None)
+@click.option("--guide-every", type=int, default=None)
+@click.option("--guidance-alpha-bar-lower", type=float, default=None)
+@click.option("--guidance-alpha-bar-upper", type=float, default=None)
+@click.option("--diffusion-eta", type=float, default=None)
 def main(
     function_name: str,
     solver_name: str,
@@ -257,11 +272,14 @@ def main(
     tag: str,
     sufix: str,
     diffusion_checkpoint_path: str | None,
-    num_diffusion_steps: int | None,
     num_candidates: int | None,
     distillation_n: int | None,
     guidance_scale: float | None,
     clip_guidance: float | None,
+    guide_every: int | None,
+    guidance_alpha_bar_lower: float | None,
+    guidance_alpha_bar_upper: float | None,
+    diffusion_eta: float | None,
 ):
     _main(
         function_name,
@@ -275,11 +293,14 @@ def main(
         tag,
         sufix,
         diffusion_checkpoint_path,
-        num_diffusion_steps,
         num_candidates,
         distillation_n,
         guidance_scale,
         clip_guidance,
+        guide_every,
+        guidance_alpha_bar_lower,
+        guidance_alpha_bar_upper,
+        diffusion_eta,
     )
 
 
