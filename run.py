@@ -6,11 +6,13 @@ please refer to the README.md.
 """
 
 # mypy: disable-error-code="import-untyped"
+import json
 from pathlib import Path
 from uuid import uuid4
 
 import click
 import numpy as np
+import torch
 from poli.core.exceptions import BudgetExhaustedException
 from poli.core.util.seeding import seed_python_numpy_and_torch
 from poli.core.data_package import DataPackage
@@ -62,6 +64,53 @@ def _build_output_dir(
         components.append(f"tag-{_format_parameter_for_path(sufix)}")
 
     return Path("./results/diffusion") / "__".join(components)
+
+
+def _save_solver_progress(
+    solver,
+    output_dir: Path,
+    solver_name: str,
+    function_name: str,
+    seed: int,
+    completed_iterations: int,
+    status: str,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    best_performance = np.asarray(solver.get_best_performance())
+    best_path = output_dir / f"{solver_name}_{function_name}_{seed}.npy"
+    np.save(best_path, best_performance)
+
+    if hasattr(solver, "get_history_as_arrays"):
+        try:
+            history_x, history_y = solver.get_history_as_arrays()
+            np.savez_compressed(
+                output_dir / f"{solver_name}_{function_name}_{seed}_history.npz",
+                x=np.asarray(history_x),
+                y=np.asarray(history_y),
+                best_performance=best_performance,
+            )
+        except Exception as exc:
+            print(f"Warning: could not save full history snapshot: {exc}")
+
+    best_value = None
+    if best_performance.size > 0 and np.isfinite(best_performance).any():
+        best_value = float(np.nanmax(best_performance))
+
+    with open(
+        output_dir / f"{solver_name}_{function_name}_{seed}_status.json",
+        "w",
+        encoding="utf-8",
+    ) as fp:
+        json.dump(
+            {
+                "status": status,
+                "completed_iterations": int(completed_iterations),
+                "best_value": best_value,
+            },
+            fp,
+            indent=2,
+        )
 
 
 def _main(
@@ -203,14 +252,6 @@ def _main(
             )
             solver.load_diffusion_model_from_checkpoint(checkpoint_path)
 
-    # 3. Optimize
-    try:
-        solver.solve(max_iter=max_iter)
-    except KeyboardInterrupt:
-        print("Interrupted optimization.")
-    except BudgetExhaustedException:
-        print("Budget exhausted.")
-
     diffusion_config_for_path = {
         "guide_mode": getattr(solver, "guide_mode", None),
         "num_candidates": getattr(solver, "num_candidates", None),
@@ -228,7 +269,63 @@ def _main(
         diffusion_config=diffusion_config_for_path,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
-    np.save(output_dir / f"{solver_name}_{function_name}_{seed}.npy", solver.get_best_performance())
+
+    # 3. Optimize with checkpointing after every iteration when step() is available
+    completed_iterations = 0
+    final_status = "completed"
+    run_error: Exception | None = None
+    try:
+        if callable(getattr(solver, "step", None)):
+            for iteration_idx in range(1, max_iter + 1):
+                solver.step()
+                completed_iterations = iteration_idx
+                _save_solver_progress(
+                    solver=solver,
+                    output_dir=output_dir,
+                    solver_name=solver_name,
+                    function_name=function_name,
+                    seed=seed,
+                    completed_iterations=completed_iterations,
+                    status="running",
+                )
+        else:
+            solver.solve(max_iter=max_iter)
+            completed_iterations = max_iter
+    except KeyboardInterrupt:
+        final_status = "interrupted"
+        print("Interrupted optimization.")
+    except BudgetExhaustedException:
+        final_status = "budget_exhausted"
+        print("Budget exhausted.")
+    except torch.OutOfMemoryError as exc:
+        final_status = "oom"
+        run_error = exc
+        print(
+            f"CUDA OOM after {completed_iterations} optimization iterations. "
+            "Saving partial progress before exiting."
+        )
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception as exc:
+        final_status = "failed"
+        run_error = exc
+        print(
+            f"Run failed with {type(exc).__name__} after {completed_iterations} "
+            "optimization iterations. Saving partial progress before exiting."
+        )
+    finally:
+        _save_solver_progress(
+            solver=solver,
+            output_dir=output_dir,
+            solver_name=solver_name,
+            function_name=function_name,
+            seed=seed,
+            completed_iterations=completed_iterations,
+            status=final_status,
+        )
+
+    if run_error is not None:
+        raise run_error
 
 @click.command()
 @click.option(
