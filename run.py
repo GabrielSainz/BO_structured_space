@@ -134,6 +134,8 @@ def _main(
     guidance_alpha_bar_upper: float | None,
     diffusion_eta: float | None,
 ):
+    checkpoint_every = 10
+
     # Defining a unique experiment id
     experiment_id = f"{uuid4()}"
 
@@ -279,15 +281,16 @@ def _main(
             for iteration_idx in range(1, max_iter + 1):
                 solver.step()
                 completed_iterations = iteration_idx
-                _save_solver_progress(
-                    solver=solver,
-                    output_dir=output_dir,
-                    solver_name=solver_name,
-                    function_name=function_name,
-                    seed=seed,
-                    completed_iterations=completed_iterations,
-                    status="running",
-                )
+                if iteration_idx % checkpoint_every == 0:
+                    _save_solver_progress(
+                        solver=solver,
+                        output_dir=output_dir,
+                        solver_name=solver_name,
+                        function_name=function_name,
+                        seed=seed,
+                        completed_iterations=completed_iterations,
+                        status="running",
+                    )
         else:
             solver.solve(max_iter=max_iter)
             completed_iterations = max_iter
