@@ -1,14 +1,28 @@
 #!/usr/bin/env bash
 
-set -u
+set -u -o pipefail
 
 SEED=1
 FUNCTION_NAME="albuterol_similarity"
 CHECKPOINT_PATH="data/trained_models/training_diffusion_on_zinc_250k/latent_diffusion_latent_dim-128-seed-0.pt"
 
-# guidance_scale clip_guidance diffusion_eta guide_every alpha_bar_lower alpha_bar_upper
-# Wider sweep around stronger guidance and larger clipping, plus a few
-# stochasticity / guidance-window variants.
+LOCAL_RESULTS="/content/BO_structured_space/results"
+DRIVE_RESULTS="/content/drive/MyDrive/university_of_copenhagen/master_thesis/poli_benchmark/results_distillation"
+DRIVE_LOGS="${DRIVE_RESULTS}/logs"
+
+mkdir -p "${DRIVE_RESULTS}"
+mkdir -p "${DRIVE_LOGS}"
+
+sync_results() {
+  echo "Syncing results to Drive..."
+  mkdir -p "${DRIVE_RESULTS}"
+  rsync -avh "${LOCAL_RESULTS}/" "${DRIVE_RESULTS}/"
+  sync
+  echo "Sync finished."
+}
+
+trap sync_results EXIT
+
 COMBINATIONS=(
   "1 1 0.0 1 1e-4 0.999"
   "1 5 0.0 1 1e-4 0.999"
@@ -19,9 +33,9 @@ COMBINATIONS=(
   "5 20 0.0 1 1e-4 0.999"
   "10 5 0.0 1 1e-4 0.999"
   "10 10 0.0 1 1e-4 0.999"
-  "10 20 0.0 1 1e-4 0.999" 
-  "10 30 0.0 1 1e-4 0.999" 
-  "10 40 0.0 1 1e-4 0.999"  # **
+  "10 20 0.0 1 1e-4 0.999"
+  "10 30 0.0 1 1e-4 0.999"
+  "10 40 0.0 1 1e-4 0.999"
   "10 50 0.0 1 1e-4 0.999"
   "15 5 0.0 1 1e-4 0.999"
   "15 10 0.0 1 1e-4 0.999"
@@ -33,7 +47,7 @@ COMBINATIONS=(
   "20 10 0.0 1 1e-4 0.999"
   "20 20 0.0 1 1e-4 0.999"
   "20 30 0.0 1 1e-4 0.999"
-  "20 40 0.0 1 1e-4 0.999" # **
+  "20 40 0.0 1 1e-4 0.999"
   "20 50 0.0 1 1e-4 0.999"
   "25 30 0.0 1 1e-4 0.999"
   "25 50 0.0 1 1e-4 0.999"
@@ -41,7 +55,7 @@ COMBINATIONS=(
   "30 50 0.0 1 1e-4 0.999"
   "15 30 0.3 1 1e-4 0.999"
   "15 30 0.6 1 1e-4 0.999"
-  "15 30 0.0 2 1e-4 0.999" # **
+  "15 30 0.0 2 1e-4 0.999"
   "15 30 0.0 1 1e-3 0.995"
 )
 
@@ -50,12 +64,16 @@ status=0
 for combo in "${COMBINATIONS[@]}"; do
   read -r guidance_scale clip_guidance diffusion_eta guide_every alpha_bar_lower alpha_bar_upper <<< "$combo"
 
+  RUN_NAME="gs-${guidance_scale}__clip-${clip_guidance}__eta-${diffusion_eta}__guideevery-${guide_every}__abl-${alpha_bar_lower}__abu-${alpha_bar_upper}"
+  LOG_FILE="${DRIVE_LOGS}/${RUN_NAME}.log"
+
   echo
   echo "============================================================"
   echo "Running seed=${SEED} guidance_scale=${guidance_scale} clip_guidance=${clip_guidance} eta=${diffusion_eta} guide_every=${guide_every} alpha_bar_window=(${alpha_bar_lower}, ${alpha_bar_upper})"
+  echo "Log file: ${LOG_FILE}"
   echo "============================================================"
 
-  if ! python run.py \
+  if python run.py \
     --function-name "${FUNCTION_NAME}" \
     --solver-name cowboys_diffusion \
     --n-dimensions 128 \
@@ -73,11 +91,16 @@ for combo in "${COMBINATIONS[@]}"; do
     --no-strict-on-hash \
     --wandb-mode disabled \
     --tag diffusion-guidance-sweep \
-    --sufix seed1-guidance-sweep
+    --sufix seed1-guidance-sweep \
+    2>&1 | tee "${LOG_FILE}"
   then
-    echo "Run failed for guidance_scale=${guidance_scale}, clip_guidance=${clip_guidance}, eta=${diffusion_eta}, guide_every=${guide_every}, alpha_bar_window=(${alpha_bar_lower}, ${alpha_bar_upper})"
+    echo "Run finished successfully." | tee -a "${LOG_FILE}"
+  else
+    echo "Run failed for ${RUN_NAME}" | tee -a "${LOG_FILE}"
     status=1
   fi
+
+  sync_results
 done
 
 exit "${status}"
