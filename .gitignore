@@ -56,6 +56,7 @@ local.*.sh
 error*.log
 output*.log
 reports/figures/
+reports/iteration_plots/
 
 # Baxus output
 conf_dict.json
