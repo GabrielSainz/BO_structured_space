@@ -67,16 +67,16 @@ run_one() {
 status=0
 
 for seed in {1..5}; do
-  run_one "albuterol_similarity"   "${seed}" 20 40 || status=1
+  run_one "albuterol_similarity"   "${seed}" 15 40 || status=1
   sync_results
 
-  run_one "amlodipine_mpo"         "${seed}" 20 40 || status=1
+  run_one "amlodipine_mpo"         "${seed}" 15 40 || status=1
   sync_results
 
-  run_one "celecoxib_rediscovery"  "${seed}" 20 40 || status=1
+  run_one "celecoxib_rediscovery"  "${seed}" 15 40 || status=1
   sync_results
 
-  run_one "deco_hop"               "${seed}" 20 40 || status=1
+  run_one "deco_hop"               "${seed}" 15 40 || status=1
   sync_results
 done
 

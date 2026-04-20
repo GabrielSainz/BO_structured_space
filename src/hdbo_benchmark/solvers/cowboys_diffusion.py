@@ -155,6 +155,8 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         self.last_selected_candidates: list[dict[str, Any]] = []
         self.pending_selected_candidates: list[dict[str, Any]] = []
         self._last_reported_history_size = int(np.asarray(x0).shape[0])
+        self.iteration_sampling_metrics_history: list[dict[str, int]] = []
+        self._seen_sampled_decoded_structures: set[str] = set()
 
     def _fit_model(
         self,
@@ -209,13 +211,24 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             self._update_distill_critic(observed_latents, bo_state)
 
         sampling_result = self._sample_guided_latents(bo_state)
+        unique_valid_sampled_structures = self._unique_valid_structures(
+            sampling_result.sampled_latents
+        )
+        unique_new_valid_structures = self._unique_valid_structures(
+            sampling_result.sampled_latents,
+            set(bo_state.observed_structures),
+        )
         total_reverse_steps = int(self.diffusion_model.config.T) if self.diffusion_model is not None else -1
         print(
             f"did {sampling_result.num_rounds} diffusion rounds "
             f"({total_reverse_steps} reverse steps each, guide_every={self.guide_every}, "
             f"alpha_bar in ({self.guidance_alpha_bar_lower:g}, {self.guidance_alpha_bar_upper:g})) "
             f"and found "
-            f"{sampling_result.num_unique} unique"
+            f"{len(unique_new_valid_structures)} unique"
+        )
+        self._record_sampling_metrics(
+            sampled_structures=unique_valid_sampled_structures,
+            unique_structures_not_in_observed_history=unique_new_valid_structures,
         )
         selected_latents = self._score_and_filter_candidates(
             sampling_result.sampled_latents,
@@ -674,20 +687,54 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         latents: torch.Tensor,
         observed_structures: set[str],
     ) -> int:
+        return len(self._unique_valid_structures(latents, observed_structures))
+
+    def _unique_valid_structures(
+        self,
+        latents: torch.Tensor,
+        observed_structures: set[str] | None = None,
+    ) -> list[str]:
         if latents.numel() == 0:
-            return 0
+            return []
 
         structures = self._latent_array_to_structure_list(latents)
-        n_unique = 0
-        seen_structures = set(observed_structures)
+        unique_structures: list[str] = []
+        seen_structures = set() if observed_structures is None else set(observed_structures)
         for structure in structures:
             if structure in seen_structures:
                 continue
             if self._structure_to_mol(structure) is None:
                 continue
             seen_structures.add(structure)
-            n_unique += 1
-        return n_unique
+            unique_structures.append(structure)
+        return unique_structures
+
+    def _record_sampling_metrics(
+        self,
+        sampled_structures: list[str],
+        unique_structures_not_in_observed_history: list[str],
+    ) -> None:
+        new_distinct_sampled_structures = [
+            structure
+            for structure in sampled_structures
+            if structure not in self._seen_sampled_decoded_structures
+        ]
+        self._seen_sampled_decoded_structures.update(sampled_structures)
+        self.iteration_sampling_metrics_history.append(
+            {
+                "iteration": len(self.iteration_sampling_metrics_history) + 1,
+                "sample_unique_decoded_molecules_in_iteration": len(sampled_structures),
+                "sample_new_distinct_decoded_molecules": len(
+                    new_distinct_sampled_structures
+                ),
+                "sample_cumulative_distinct_decoded_molecules": len(
+                    self._seen_sampled_decoded_structures
+                ),
+                "sample_unique_decoded_molecules_not_in_observed_history": len(
+                    unique_structures_not_in_observed_history
+                ),
+            }
+        )
 
     def _structure_preview(self, structure: str, max_length: int = 80) -> str:
         if len(structure) <= max_length:

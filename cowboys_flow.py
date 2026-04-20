@@ -279,6 +279,8 @@ class COWBOYSFlow(BaseBayesianOptimization):
         self._flow_is_initialized = False
         self.accepted_latent_history = torch.zeros((0, 0), device=self.device, dtype=self.dtype)
         self.last_sampling_diagnostics: dict[str, float | int] = {}
+        self.iteration_sampling_metrics_history: list[dict[str, int]] = []
+        self._seen_sampled_decoded_structures: set[str] = set()
 
     def _fit_model(
         self, model: type[SingleTaskGP], x: np.ndarray, y: np.ndarray
@@ -332,11 +334,17 @@ class COWBOYSFlow(BaseBayesianOptimization):
 
         initial_states = self._initialize_chains(observed_latents, y.reshape(-1))
         mh_result = self._run_mh_sampling(bo_state, initial_states)
-        n_unique = self._count_unique_new_structures(
-            mh_result.sampled_latents,
+        sampled_structures = self._decode_latents(mh_result.sampled_latents)
+        unique_new_structures = self._unique_new_structures(
+            sampled_structures,
             bo_state.observed_structures,
         )
+        n_unique = len(unique_new_structures)
         print(f"did {self.n_mh_steps} steps and found {n_unique} unique")
+        self._record_sampling_metrics(
+            sampled_structures=sampled_structures,
+            unique_structures_not_in_observed_history=unique_new_structures,
+        )
         self._update_replay_buffer(mh_result.accepted_latents)
         print(
             "mcmc diagnostics: "
@@ -791,11 +799,39 @@ class COWBOYSFlow(BaseBayesianOptimization):
     def _latent_to_unit(self, latents: np.ndarray) -> np.ndarray:
         return from_range_to_unit_cube(latents, self.vae_bounds)
 
-    def _count_unique_new_structures(
-        self, sampled_latents: torch.Tensor, observed_structures: list[str]
-    ) -> int:
-        candidate_structures = self._decode_latents(sampled_latents)
-        return len(set(candidate_structures).difference(set(observed_structures)))
+    def _unique_new_structures(
+        self, sampled_structures: list[str], observed_structures: list[str]
+    ) -> list[str]:
+        observed = set(observed_structures)
+        return list(set(sampled_structures).difference(observed))
+
+    def _record_sampling_metrics(
+        self,
+        sampled_structures: list[str],
+        unique_structures_not_in_observed_history: list[str],
+    ) -> None:
+        unique_sampled_structures = list(dict.fromkeys(sampled_structures))
+        new_distinct_sampled_structures = [
+            structure
+            for structure in unique_sampled_structures
+            if structure not in self._seen_sampled_decoded_structures
+        ]
+        self._seen_sampled_decoded_structures.update(unique_sampled_structures)
+        self.iteration_sampling_metrics_history.append(
+            {
+                "iteration": len(self.iteration_sampling_metrics_history) + 1,
+                "sample_unique_decoded_molecules_in_iteration": len(unique_sampled_structures),
+                "sample_new_distinct_decoded_molecules": len(
+                    new_distinct_sampled_structures
+                ),
+                "sample_cumulative_distinct_decoded_molecules": len(
+                    self._seen_sampled_decoded_structures
+                ),
+                "sample_unique_decoded_molecules_not_in_observed_history": len(
+                    set(unique_structures_not_in_observed_history)
+                ),
+            }
+        )
 
     def _to_tensor(self, values: np.ndarray | torch.Tensor) -> torch.Tensor:
         if isinstance(values, torch.Tensor):

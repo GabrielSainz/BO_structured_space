@@ -7,6 +7,7 @@ please refer to the README.md.
 
 # mypy: disable-error-code="import-untyped"
 import json
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -34,10 +35,19 @@ from hdbo_benchmark.utils.experiments.problem_transformations import (
 from hdbo_benchmark.utils.experiments.verify_status_pre_experiment import (
     verify_repos_are_clean,
 )
+from hdbo_benchmark.utils.logging.iteration_metrics import (
+    build_iteration_metric_artifacts,
+)
 from hdbo_benchmark.utils.logging.idempotence_of_experiments import (
     experiment_has_already_run,
 )
 from hdbo_benchmark.utils.logging.wandb_observer import ObserverConfig
+
+ITERATION_METRIC_SOLVERS = {
+    "cowboys",
+    "cowboys_flow",
+    "cowboys_diffusion",
+}
 
 
 def _format_parameter_for_path(value: float | int | str | None) -> str:
@@ -66,6 +76,17 @@ def _build_output_dir(
     return Path("./results/diffusion") / "__".join(components)
 
 
+def _path_for_io(path: Path) -> str | Path:
+    resolved_path = path.resolve()
+    path_str = str(resolved_path)
+    if os.name != "nt" or len(path_str) < 240:
+        return resolved_path
+
+    if path_str.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + path_str.lstrip("\\")
+    return "\\\\?\\" + path_str
+
+
 def _save_solver_progress(
     solver,
     output_dir: Path,
@@ -74,22 +95,70 @@ def _save_solver_progress(
     seed: int,
     completed_iterations: int,
     status: str,
+    initial_history_size: int,
+    save_iteration_results: bool,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     best_performance = np.asarray(solver.get_best_performance())
     best_path = output_dir / f"{solver_name}_{function_name}_{seed}.npy"
-    np.save(best_path, best_performance)
+    best_path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(_path_for_io(best_path), best_performance)
+    history_path = output_dir / f"{solver_name}_{function_name}_{seed}_history.npz"
+    iteration_results_path = (
+        output_dir / f"{solver_name}_{function_name}_{seed}_iteration_results.json"
+    )
+    status_path = output_dir / f"{solver_name}_{function_name}_{seed}_status.json"
 
+    iteration_results_requested = bool(
+        save_iteration_results and solver_name in ITERATION_METRIC_SOLVERS
+    )
+    iteration_results_written = False
+    history_written = False
     if hasattr(solver, "get_history_as_arrays"):
         try:
             history_x, history_y = solver.get_history_as_arrays()
-            np.savez_compressed(
-                output_dir / f"{solver_name}_{function_name}_{seed}_history.npz",
-                x=np.asarray(history_x),
-                y=np.asarray(history_y),
-                best_performance=best_performance,
-            )
+            history_payload = {
+                "x": np.asarray(history_x),
+                "y": np.asarray(history_y),
+                "best_performance": best_performance,
+            }
+
+            if iteration_results_requested:
+                try:
+                    iteration_json_payload, iteration_series = (
+                        build_iteration_metric_artifacts(
+                            solver=solver,
+                            history_x=np.asarray(history_x),
+                            history_y=np.asarray(history_y),
+                            initial_history_size=initial_history_size,
+                            completed_iterations=completed_iterations,
+                        )
+                    )
+                    history_payload.update(iteration_series)
+                    iteration_results_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(
+                        _path_for_io(iteration_results_path),
+                        "w",
+                        encoding="utf-8",
+                    ) as fp:
+                        json.dump(
+                            {
+                                "solver_name": solver_name,
+                                "function_name": function_name,
+                                "seed": int(seed),
+                                **iteration_json_payload,
+                            },
+                            fp,
+                            indent=2,
+                        )
+                    iteration_results_written = True
+                except Exception as exc:
+                    print(f"Warning: could not save iteration metrics: {exc}")
+
+            history_path.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(_path_for_io(history_path), **history_payload)
+            history_written = True
         except Exception as exc:
             print(f"Warning: could not save full history snapshot: {exc}")
 
@@ -97,16 +166,18 @@ def _save_solver_progress(
     if best_performance.size > 0 and np.isfinite(best_performance).any():
         best_value = float(np.nanmax(best_performance))
 
-    with open(
-        output_dir / f"{solver_name}_{function_name}_{seed}_status.json",
-        "w",
-        encoding="utf-8",
-    ) as fp:
+    status_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(_path_for_io(status_path), "w", encoding="utf-8") as fp:
         json.dump(
             {
                 "status": status,
                 "completed_iterations": int(completed_iterations),
                 "best_value": best_value,
+                "history_file": history_path.name if history_written else None,
+                "iteration_results_enabled": iteration_results_requested,
+                "iteration_results_file": (
+                    iteration_results_path.name if iteration_results_written else None
+                ),
             },
             fp,
             indent=2,
@@ -121,20 +192,22 @@ def _main(
     max_iter: int,
     strict_on_hash: bool,
     force_run: bool,
-    wandb_mode: str,
-    tag: str,    
-    sufix: str,
-    diffusion_checkpoint_path: str | None,
-    num_candidates: int | None,
-    distillation_n: int | None,
-    guidance_scale: float | None,
-    clip_guidance: float | None,
-    guide_every: int | None,
-    guidance_alpha_bar_lower: float | None,
-    guidance_alpha_bar_upper: float | None,
-    diffusion_eta: float | None,
+    wandb_mode: str = "disabled",
+    tag: str = "default",
+    sufix: str = "default",
+    diffusion_checkpoint_path: str | None = None,
+    num_candidates: int | None = None,
+    distillation_n: int | None = None,
+    guidance_scale: float | None = None,
+    clip_guidance: float | None = None,
+    guide_every: int | None = None,
+    guidance_alpha_bar_lower: float | None = None,
+    guidance_alpha_bar_upper: float | None = None,
+    diffusion_eta: float | None = None,
+    save_iteration_results: bool = True,
+    checkpoint_every: int = 10,
 ):
-    checkpoint_every = 10
+    checkpoint_every = max(1, int(checkpoint_every))
 
     # Defining a unique experiment id
     experiment_id = f"{uuid4()}"
@@ -211,6 +284,7 @@ def _main(
     # problem.data_package = DataPackage(unsupervised_data=x0, supervised_data=(x0, y0))
 
     # load the solver
+    initial_history_size = int(np.asarray(problem.data_package.supervised_data[0]).shape[0])
     diffusion_solver_kwargs = {}
     if solver_name == "cowboys_diffusion":
         if num_candidates is not None:
@@ -269,7 +343,7 @@ def _main(
         solver_name=solver_name,
         sufix=sufix,
         diffusion_config=diffusion_config_for_path,
-    )
+    ).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 3. Optimize with checkpointing after every iteration when step() is available
@@ -290,6 +364,8 @@ def _main(
                         seed=seed,
                         completed_iterations=completed_iterations,
                         status="running",
+                        initial_history_size=initial_history_size,
+                        save_iteration_results=save_iteration_results,
                     )
         else:
             solver.solve(max_iter=max_iter)
@@ -325,6 +401,8 @@ def _main(
             seed=seed,
             completed_iterations=completed_iterations,
             status=final_status,
+            initial_history_size=initial_history_size,
+            save_iteration_results=save_iteration_results,
         )
 
     if run_error is not None:
@@ -360,6 +438,11 @@ def _main(
 @click.option("--guidance-alpha-bar-lower", type=float, default=None)
 @click.option("--guidance-alpha-bar-upper", type=float, default=None)
 @click.option("--diffusion-eta", type=float, default=None)
+@click.option(
+    "--save-iteration-results/--no-save-iteration-results",
+    default=True,
+)
+@click.option("--checkpoint-every", type=int, default=10)
 def main(
     function_name: str,
     solver_name: str,
@@ -380,6 +463,8 @@ def main(
     guidance_alpha_bar_lower: float | None,
     guidance_alpha_bar_upper: float | None,
     diffusion_eta: float | None,
+    save_iteration_results: bool,
+    checkpoint_every: int,
 ):
     _main(
         function_name,
@@ -401,6 +486,8 @@ def main(
         guidance_alpha_bar_lower,
         guidance_alpha_bar_upper,
         diffusion_eta,
+        save_iteration_results,
+        checkpoint_every,
     )
 
 

@@ -72,6 +72,8 @@ class COWBOYS(BaseBayesianOptimization):
         self.num_chains = 10 # number of MCMC chains
         self.n_steps = 100 # minimum number of MCMC steps
         self.betas = torch.tensor([0.1]).to(dtype=torch.float64, device=self.device)[None,:].repeat(self.num_chains,1) # keep track of beta param for each MCMC chain
+        self.iteration_sampling_metrics_history: list[dict[str, int]] = []
+        self._seen_sampled_decoded_structures: set[str] = set()
 
     def _fit_model(
         self, model: SingleTaskGP, x: np.ndarray, y: np.ndarray
@@ -181,11 +183,16 @@ class COWBOYS(BaseBayesianOptimization):
 
                 counter+=1
                 # keep track of the unique samples found so far
-                unique_idx = [selfies_samples.index(x) for x in list(set(selfies_samples).difference(set(prev_selfies)))] 
+                unique_new_structures = list(set(selfies_samples).difference(set(prev_selfies)))
+                unique_idx = [selfies_samples.index(x) for x in unique_new_structures]
                 if counter>=self.n_steps and len(unique_idx)>=self.batch_size:
                     # end the loop if we have done enough steps and found enough unique samples
                     break
             print(f"did {counter} steps and found {len(unique_idx)} unique")
+            self._record_sampling_metrics(
+                sampled_structures=selfies_samples,
+                unique_structures_not_in_observed_history=unique_new_structures,
+            )
 
 
         # filter the unique samples found so far if there are more than than desired using EI heuristic
@@ -223,3 +230,31 @@ class COWBOYS(BaseBayesianOptimization):
                 out[i, k % 2048] += v
 
         return torch.tensor(out).to(dtype=torch.float64, device=self.device)
+
+    def _record_sampling_metrics(
+        self,
+        sampled_structures: list[str],
+        unique_structures_not_in_observed_history: list[str],
+    ) -> None:
+        unique_sampled_structures = list(dict.fromkeys(sampled_structures))
+        new_distinct_sampled_structures = [
+            structure
+            for structure in unique_sampled_structures
+            if structure not in self._seen_sampled_decoded_structures
+        ]
+        self._seen_sampled_decoded_structures.update(unique_sampled_structures)
+        self.iteration_sampling_metrics_history.append(
+            {
+                "iteration": len(self.iteration_sampling_metrics_history) + 1,
+                "sample_unique_decoded_molecules_in_iteration": len(unique_sampled_structures),
+                "sample_new_distinct_decoded_molecules": len(
+                    new_distinct_sampled_structures
+                ),
+                "sample_cumulative_distinct_decoded_molecules": len(
+                    self._seen_sampled_decoded_structures
+                ),
+                "sample_unique_decoded_molecules_not_in_observed_history": len(
+                    set(unique_structures_not_in_observed_history)
+                ),
+            }
+        )
