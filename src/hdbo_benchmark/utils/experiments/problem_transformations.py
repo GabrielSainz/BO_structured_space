@@ -19,15 +19,27 @@ if TYPE_CHECKING:
     from hdbo_benchmark.generative_models.ae_for_esm import LitAutoEncoder
 
 
+def _resolve_diagnostic_function(
+    f: Callable[[np.ndarray], np.ndarray],
+) -> Callable[[np.ndarray], np.ndarray]:
+    raw_black_box = getattr(f, "_black_box", None)
+    if callable(raw_black_box):
+        return lambda x: raw_black_box(x)
+
+    raw_function = getattr(f, "function", None)
+    if callable(raw_function):
+        return raw_function
+
+    return f
+
+
 def _in_latent_space_of_proteins(
     problem: Problem,
     ae: LitAutoEncoder,
     latent_space_bounds: tuple[float, float],
 ) -> Callable[[np.ndarray], np.ndarray]:
     f = problem.black_box
-    raw_f = getattr(f, "function", None)
-    if not callable(raw_f):
-        raw_f = f
+    raw_f = _resolve_diagnostic_function(f)
     x0 = problem.x0
 
     def _latent_f(z: np.ndarray) -> np.ndarray:
@@ -87,9 +99,7 @@ def _in_the_latent_space_of_molecules(
     problem: Problem, vae: VAE, latent_space_bounds: tuple[float, float]
 ) -> Callable[[np.ndarray], np.ndarray]:
     f = problem.black_box
-    raw_f = getattr(f, "function", None)
-    if not callable(raw_f):
-        raw_f = f
+    raw_f = _resolve_diagnostic_function(f)
 
     def _latent_f(z: np.ndarray) -> np.ndarray:
         z = from_unit_cube_to_range(z, latent_space_bounds)
@@ -125,9 +135,7 @@ def _in_onehot_space(
     problem: Problem, onehot: OneHot, latent_space_bounds: tuple[float, float]
 ) -> Callable[[np.ndarray], np.ndarray]:
     f = problem.black_box
-    raw_f = getattr(f, "function", None)
-    if not callable(raw_f):
-        raw_f = f
+    raw_f = _resolve_diagnostic_function(f)
 
     def _latent_f(z: np.ndarray) -> np.ndarray:
         z = from_unit_cube_to_range(z, latent_space_bounds)

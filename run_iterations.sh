@@ -1,4 +1,7 @@
 #!/bin/bash
+# chmod +x run_iterations.sh
+# ./run_iterations.sh
+
 for i in {1..10}
 do
     python run.py --function-name osimetrinib_mpo --solver-name cowboys --max-iter 300 --seed $i --no-strict-on-hash --sufix "cowboys_iteration2" --save-iteration-results --checkpoint-every 1

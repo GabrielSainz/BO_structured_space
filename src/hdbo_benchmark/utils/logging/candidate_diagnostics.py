@@ -11,7 +11,7 @@ TOP_K_COUNT_METRIC = "available_unique_top_10_candidate_count"
 
 
 def resolve_diagnostic_evaluator(black_box: Any) -> Any:
-    for attribute_name in ("raw_function", "diagnostic_function"):
+    for attribute_name in ("diagnostic_function", "raw_function"):
         evaluator = getattr(black_box, attribute_name, None)
         if callable(evaluator):
             return evaluator
