@@ -46,6 +46,7 @@ from hdbo_benchmark.utils.logging.wandb_observer import ObserverConfig
 ITERATION_METRIC_SOLVERS = {
     "cowboys",
     "cowboys_flow",
+    "cowboys_flow_2",
     "cowboys_diffusion",
 }
 

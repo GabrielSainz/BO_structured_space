@@ -1,5 +1,5 @@
 #!/bin/bash
-for i in {1..10}
+for i in {1..5}
 do
     python run.py --function-name osimetrinib_mpo --solver-name cowboys_flow_2 --max-iter 300 --seed $i --no-strict-on-hash --sufix "nflow3_iteration" --save-iteration-results --checkpoint-every 1
 

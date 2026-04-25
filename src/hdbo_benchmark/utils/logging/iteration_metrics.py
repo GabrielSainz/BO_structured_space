@@ -7,6 +7,11 @@ import selfies as sf
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
+from hdbo_benchmark.utils.logging.candidate_diagnostics import (
+    TOP_K_COUNT_METRIC,
+    TOP_K_MEAN_OBJECTIVE_METRIC,
+)
+
 
 def build_iteration_metric_artifacts(
     solver: Any,
@@ -49,8 +54,20 @@ def build_iteration_metric_artifacts(
         "sample_unique_decoded_molecules_not_in_observed_history",
     ]
     sampling_metric_history = getattr(solver, "iteration_sampling_metrics_history", [])
+    top_candidate_metric_names = [
+        TOP_K_MEAN_OBJECTIVE_METRIC,
+        TOP_K_COUNT_METRIC,
+    ]
+    top_candidate_metric_history = getattr(
+        solver,
+        "iteration_candidate_diagnostics_history",
+        [],
+    )
     for metric_name in sampling_metric_names:
         if sampling_metric_history:
+            series[metric_name] = []
+    for metric_name in top_candidate_metric_names:
+        if top_candidate_metric_history:
             series[metric_name] = []
     iteration_records: list[dict[str, Any]] = []
 
@@ -115,6 +132,17 @@ def build_iteration_metric_artifacts(
             series[metric_name].append(
                 sampling_metrics_for_iteration.get(metric_name, np.nan)
             )
+        top_candidate_metrics_for_iteration = (
+            top_candidate_metric_history[iteration_offset]
+            if iteration_offset < len(top_candidate_metric_history)
+            else {}
+        )
+        for metric_name in top_candidate_metric_names:
+            if metric_name not in series:
+                continue
+            series[metric_name].append(
+                top_candidate_metrics_for_iteration.get(metric_name, np.nan)
+            )
 
         iteration_record = {
             "iteration": iteration_offset + 1,
@@ -144,6 +172,21 @@ def build_iteration_metric_artifacts(
             iteration_record[metric_name] = _serialize_number(
                 sampling_metrics_for_iteration.get(metric_name, np.nan)
             )
+        for metric_name in top_candidate_metric_names:
+            if metric_name not in series:
+                continue
+            iteration_record[metric_name] = _serialize_number(
+                top_candidate_metrics_for_iteration.get(metric_name, np.nan)
+            )
+        if "top_k" in top_candidate_metrics_for_iteration:
+            iteration_record["top_k_candidate_diagnostics_limit"] = int(
+                top_candidate_metrics_for_iteration["top_k"]
+            )
+        if "top_candidates" in top_candidate_metrics_for_iteration:
+            iteration_record["top_candidate_diagnostics"] = [
+                _serialize_candidate_diagnostic(candidate)
+                for candidate in top_candidate_metrics_for_iteration["top_candidates"]
+            ]
         iteration_records.append(iteration_record)
 
     series_arrays = {
@@ -285,3 +328,19 @@ def _serialize_number(value: Any) -> Any:
             return None
         return float(value)
     return value
+
+
+def _serialize_candidate_diagnostic(candidate: dict[str, Any]) -> dict[str, Any]:
+    serialized_candidate: dict[str, Any] = {}
+    for key, value in candidate.items():
+        if isinstance(value, dict):
+            serialized_candidate[key] = {
+                nested_key: _serialize_number(nested_value)
+                for nested_key, nested_value in value.items()
+            }
+            continue
+        if isinstance(value, (list, tuple, np.ndarray)):
+            serialized_candidate[key] = _serialize_vector(value)
+            continue
+        serialized_candidate[key] = _serialize_number(value)
+    return serialized_candidate

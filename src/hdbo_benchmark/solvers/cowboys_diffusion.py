@@ -33,6 +33,10 @@ from hdbo_benchmark.generative_models.latent_diffusion import (
 )
 from hdbo_benchmark.generative_models.vae import VAE
 from hdbo_benchmark.utils.experiments.normalization import from_range_to_unit_cube
+from hdbo_benchmark.utils.logging.candidate_diagnostics import (
+    TOP_K_CANDIDATES,
+    build_top_candidate_diagnostics,
+)
 
 try:
     from botorch.acquisition.analytic import LogExpectedImprovement
@@ -156,6 +160,7 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         self.pending_selected_candidates: list[dict[str, Any]] = []
         self._last_reported_history_size = int(np.asarray(x0).shape[0])
         self.iteration_sampling_metrics_history: list[dict[str, int]] = []
+        self.iteration_candidate_diagnostics_history: list[dict[str, Any]] = []
         self._seen_sampled_decoded_structures: set[str] = set()
 
     def _fit_model(
@@ -230,10 +235,11 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             sampled_structures=unique_valid_sampled_structures,
             unique_structures_not_in_observed_history=unique_new_valid_structures,
         )
-        selected_latents = self._score_and_filter_candidates(
+        selected_latents, ranked_diagnostic_candidates = self._score_and_filter_candidates(
             sampling_result.sampled_latents,
             bo_state,
         )
+        self._record_top_candidate_diagnostics(ranked_diagnostic_candidates)
         selected_candidate_metadata = self._build_selected_candidate_metadata(
             selected_latents,
             bo_state,
@@ -486,9 +492,9 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         self,
         candidate_latents: torch.Tensor,
         bo_state: StructuredBOState,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, list[dict[str, Any]]]:
         if candidate_latents.numel() == 0:
-            return candidate_latents
+            return candidate_latents, []
 
         log_weight, structures, fingerprints, valid_mask = self._evaluate_log_weight(
             candidate_latents,
@@ -506,18 +512,26 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             unique_indices.append(idx)
 
         if not unique_indices:
-            return candidate_latents[:1]
+            return candidate_latents[:1], []
 
         unique_latents = candidate_latents[unique_indices]
         unique_features = fingerprints[unique_indices]
         unique_log_weight = log_weight[unique_indices]
+        unique_structures = [structures[idx] for idx in unique_indices]
+        selection_scores = self._evaluate_selection_scores(unique_features, bo_state)
+        ranked_diagnostic_candidates = self._build_ranked_candidate_diagnostics(
+            unique_latents,
+            unique_structures,
+            selection_scores,
+            bo_state.observed_structures,
+        )
 
         if unique_latents.shape[0] <= self.batch_size:
-            return unique_latents
+            return unique_latents, ranked_diagnostic_candidates
 
         if self.batch_size == 1:
             best_idx = int(torch.argmax(unique_log_weight).item())
-            return unique_latents[best_idx : best_idx + 1]
+            return unique_latents[best_idx : best_idx + 1], ranked_diagnostic_candidates
 
         acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
         chosen_features, _ = optimize_acqf_discrete(
@@ -527,7 +541,83 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             max_batch_size=1_000,
         )
         chosen_indices = self._match_selected_features(unique_features, chosen_features)
-        return unique_latents[chosen_indices]
+        return unique_latents[chosen_indices], ranked_diagnostic_candidates
+
+    def _evaluate_selection_scores(
+        self,
+        candidate_features: torch.Tensor,
+        bo_state: StructuredBOState,
+    ) -> torch.Tensor:
+        acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
+        with torch.no_grad():
+            selection_scores = acquisition(candidate_features[:, None, :]).view(-1)
+        return torch.nan_to_num(
+            selection_scores,
+            nan=self.min_log_value,
+            neginf=self.min_log_value,
+            posinf=0.0,
+        )
+
+    def _build_ranked_candidate_diagnostics(
+        self,
+        candidate_latents: torch.Tensor,
+        candidate_structures: list[str],
+        selection_scores: torch.Tensor,
+        observed_structures: list[str],
+    ) -> list[dict[str, Any]]:
+        if candidate_latents.numel() == 0 or not candidate_structures:
+            return []
+
+        unit_latents = self._latent_to_unit(candidate_latents.detach().cpu().numpy())
+        ranked_indices = torch.argsort(selection_scores, descending=True).tolist()
+        ranked_candidates: list[dict[str, Any]] = []
+        seen_molecules = {
+            canonical_smiles
+            for structure in observed_structures
+            if (canonical_smiles := self._canonical_smiles(structure)) is not None
+        }
+
+        for idx in ranked_indices:
+            canonical_smiles = self._canonical_smiles(candidate_structures[idx])
+            if canonical_smiles is None:
+                continue
+            if canonical_smiles in seen_molecules:
+                continue
+
+            seen_molecules.add(canonical_smiles)
+            ranked_candidates.append(
+                {
+                    "source": "diffusion",
+                    "structure": candidate_structures[idx],
+                    "canonical_smiles": canonical_smiles,
+                    "selection_score": float(selection_scores[idx].detach().cpu().item()),
+                    "unit_latent": unit_latents[idx].tolist(),
+                }
+            )
+
+        return ranked_candidates
+
+    def _record_top_candidate_diagnostics(
+        self,
+        ranked_candidates: list[dict[str, Any]],
+    ) -> None:
+        try:
+            diagnostics = build_top_candidate_diagnostics(
+                self.black_box,
+                ranked_candidates,
+                top_k=TOP_K_CANDIDATES,
+            )
+        except Exception as exc:
+            print(f"Warning: could not evaluate top-k diagnostic candidates: {exc}")
+            diagnostics = {
+                "top_k": int(TOP_K_CANDIDATES),
+                "available_unique_top_10_candidate_count": 0,
+                "mean_available_unique_top_10_candidate_objective": np.nan,
+                "top_candidates": [],
+            }
+
+        diagnostics["iteration"] = len(self.iteration_candidate_diagnostics_history) + 1
+        self.iteration_candidate_diagnostics_history.append(diagnostics)
 
     def _evaluate_log_weight(
         self,
@@ -681,6 +771,12 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         except Exception:
             return None
         return Chem.MolFromSmiles(smiles)
+
+    def _canonical_smiles(self, structure: str) -> str | None:
+        mol = self._structure_to_mol(structure)
+        if mol is None:
+            return None
+        return Chem.MolToSmiles(mol, canonical=True)
 
     def _count_unique_valid_structures(
         self,

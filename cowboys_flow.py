@@ -34,6 +34,10 @@ from rdkit.Chem import rdMolDescriptors
 from hdbo_benchmark.utils.experiments.normalization import (
     from_range_to_unit_cube,
 )
+from hdbo_benchmark.utils.logging.candidate_diagnostics import (
+    TOP_K_CANDIDATES,
+    build_top_candidate_diagnostics,
+)
 
 warnings.filterwarnings("ignore", message=".*contained to the unit cube")
 RDLogger.DisableLog("rdApp.*")
@@ -280,6 +284,7 @@ class COWBOYSFlow(BaseBayesianOptimization):
         self.accepted_latent_history = torch.zeros((0, 0), device=self.device, dtype=self.dtype)
         self.last_sampling_diagnostics: dict[str, float | int] = {}
         self.iteration_sampling_metrics_history: list[dict[str, int]] = []
+        self.iteration_candidate_diagnostics_history: list[dict[str, Any]] = []
         self._seen_sampled_decoded_structures: set[str] = set()
 
     def _fit_model(
@@ -354,11 +359,12 @@ class COWBOYSFlow(BaseBayesianOptimization):
             f"replay_buffer={self.accepted_latent_history.shape[0]}"
         )
 
-        selected_latents = self._select_candidates(
+        selected_latents, ranked_diagnostic_candidates = self._select_candidates(
             mh_result.sampled_latents,
             weighted_pool,
             bo_state,
         )
+        self._record_top_candidate_diagnostics(ranked_diagnostic_candidates)
 
         self.last_sampling_diagnostics = {
             "acceptance_rate": mh_result.acceptance_rate,
@@ -605,13 +611,13 @@ class COWBOYSFlow(BaseBayesianOptimization):
         sampled_latents: torch.Tensor,
         weighted_pool: WeightedLatentPool,
         bo_state: StructuredBOState,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, list[dict[str, Any]]]:
         observed_structures = set(bo_state.observed_structures)
         candidate_latents = sampled_latents
 
         candidate_structures = self._decode_latents(candidate_latents)
         unique_latents: list[torch.Tensor] = []
-        unique_structures: list[str] = []
+        unique_metadata: list[dict[str, str]] = []
         seen_structures = set(observed_structures)
 
         for latent, structure in zip(candidate_latents, candidate_structures):
@@ -619,7 +625,12 @@ class COWBOYSFlow(BaseBayesianOptimization):
                 continue
             seen_structures.add(structure)
             unique_latents.append(latent.unsqueeze(0))
-            unique_structures.append(structure)
+            unique_metadata.append(
+                {
+                    "source": "mcmc",
+                    "structure": structure,
+                }
+            )
 
         if len(unique_latents) < self.batch_size:
             pool_order = torch.argsort(weighted_pool.normalized_weights, descending=True)
@@ -629,20 +640,50 @@ class COWBOYSFlow(BaseBayesianOptimization):
                     continue
                 seen_structures.add(structure)
                 unique_latents.append(weighted_pool.latents[idx : idx + 1])
-                unique_structures.append(structure)
+                unique_metadata.append(
+                    {
+                        "source": "pool_fallback",
+                        "structure": structure,
+                    }
+                )
                 if len(unique_latents) >= self.batch_size:
                     break
 
         if not unique_latents:
             best_index = int(torch.argmax(weighted_pool.normalized_weights).item())
             fallback = weighted_pool.latents[best_index : best_index + 1]
-            return fallback
+            fallback_metadata = [
+                {
+                    "source": "pool_fallback",
+                    "structure": weighted_pool.structures[best_index],
+                }
+            ]
+            ranked_fallback_candidates = self._build_ranked_candidate_diagnostics(
+                fallback,
+                fallback_metadata,
+                torch.tensor(
+                    [weighted_pool.log_weights[best_index].detach().cpu().item()],
+                    device=self.device,
+                    dtype=self.dtype,
+                ),
+                bo_state.observed_structures,
+            )
+            return fallback, ranked_fallback_candidates
 
         stacked_latents = torch.cat(unique_latents, dim=0)
+        candidate_features = self._structures_to_feature_tensors(
+            [candidate["structure"] for candidate in unique_metadata]
+        )
+        selection_scores = self._evaluate_selection_scores(candidate_features, bo_state)
+        ranked_diagnostic_candidates = self._build_ranked_candidate_diagnostics(
+            stacked_latents,
+            unique_metadata,
+            selection_scores,
+            bo_state.observed_structures,
+        )
         if stacked_latents.shape[0] <= self.batch_size:
-            return stacked_latents
+            return stacked_latents, ranked_diagnostic_candidates
 
-        candidate_features = self._structures_to_feature_tensors(unique_structures)
         acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
         chosen_features, _ = optimize_acqf_discrete(
             acquisition,
@@ -651,7 +692,82 @@ class COWBOYSFlow(BaseBayesianOptimization):
             max_batch_size=1_000,
         )
         chosen_indices = self._match_selected_features(candidate_features, chosen_features)
-        return stacked_latents[chosen_indices]
+        return stacked_latents[chosen_indices], ranked_diagnostic_candidates
+
+    def _evaluate_selection_scores(
+        self,
+        candidate_features: torch.Tensor,
+        bo_state: StructuredBOState,
+    ) -> torch.Tensor:
+        acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
+        with torch.no_grad():
+            selection_scores = acquisition(candidate_features[:, None, :]).view(-1)
+        return torch.nan_to_num(
+            selection_scores,
+            nan=self.min_log_value,
+            neginf=self.min_log_value,
+            posinf=0.0,
+        )
+
+    def _build_ranked_candidate_diagnostics(
+        self,
+        candidate_latents: torch.Tensor,
+        candidate_metadata: list[dict[str, str]],
+        selection_scores: torch.Tensor,
+        observed_structures: list[str],
+    ) -> list[dict[str, Any]]:
+        if candidate_latents.numel() == 0 or not candidate_metadata:
+            return []
+
+        unit_latents = self._latent_to_unit(candidate_latents.detach().cpu().numpy())
+        ranked_indices = torch.argsort(selection_scores, descending=True).tolist()
+        ranked_candidates: list[dict[str, Any]] = []
+        seen_molecules = {
+            canonical_smiles
+            for structure in observed_structures
+            if (canonical_smiles := self._canonical_smiles(structure)) is not None
+        }
+
+        for idx in ranked_indices:
+            canonical_smiles = self._canonical_smiles(candidate_metadata[idx]["structure"])
+            if canonical_smiles is None:
+                continue
+            if canonical_smiles in seen_molecules:
+                continue
+
+            seen_molecules.add(canonical_smiles)
+            ranked_candidates.append(
+                {
+                    **candidate_metadata[idx],
+                    "canonical_smiles": canonical_smiles,
+                    "selection_score": float(selection_scores[idx].detach().cpu().item()),
+                    "unit_latent": unit_latents[idx].tolist(),
+                }
+            )
+
+        return ranked_candidates
+
+    def _record_top_candidate_diagnostics(
+        self,
+        ranked_candidates: list[dict[str, Any]],
+    ) -> None:
+        try:
+            diagnostics = build_top_candidate_diagnostics(
+                self.black_box,
+                ranked_candidates,
+                top_k=TOP_K_CANDIDATES,
+            )
+        except Exception as exc:
+            print(f"Warning: could not evaluate top-k diagnostic candidates: {exc}")
+            diagnostics = {
+                "top_k": int(TOP_K_CANDIDATES),
+                "available_unique_top_10_candidate_count": 0,
+                "mean_available_unique_top_10_candidate_objective": np.nan,
+                "top_candidates": [],
+            }
+
+        diagnostics["iteration"] = len(self.iteration_candidate_diagnostics_history) + 1
+        self.iteration_candidate_diagnostics_history.append(diagnostics)
 
     def _update_replay_buffer(self, accepted_latents: torch.Tensor) -> None:
         if accepted_latents.numel() == 0:
@@ -666,6 +782,23 @@ class COWBOYSFlow(BaseBayesianOptimization):
     def _decode_latents(self, latents: torch.Tensor) -> list[str]:
         decoded = self.vae.decode_to_string_array(latents.detach().cpu().numpy())
         return self._normalize_structure_array(decoded)
+
+    def _structure_to_mol(self, structure: str) -> Any:
+        candidate_smiles = structure
+        try:
+            candidate_smiles = sf.decoder(structure)
+        except Exception:
+            candidate_smiles = structure
+
+        if not candidate_smiles:
+            return None
+        return Chem.MolFromSmiles(candidate_smiles)
+
+    def _canonical_smiles(self, structure: str) -> str | None:
+        mol = self._structure_to_mol(structure)
+        if mol is None:
+            return None
+        return Chem.MolToSmiles(mol, canonical=True)
 
     def _normalize_structure_array(self, structures: np.ndarray) -> list[str]:
         normalized: list[str] = []

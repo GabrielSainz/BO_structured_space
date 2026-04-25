@@ -2,24 +2,23 @@
 
 Examples
 --------
-
-python reports/plot_iteration_metrics.py --problem osimetrinib_mpo --methods cowboys nflow --seeds 1 2 3 4 5 --stride 10
-python reports/plot_iteration_metrics.py --problem median_2 --methods cowboys nflow --seeds 1 2 3 4 5 --stride 10
-python reports/plot_iteration_metrics.py --problem amlodipine_mpo --methods cowboys nflow --seeds 1 2 3 4 5 --stride 10
-python reports/plot_iteration_metrics.py --problem perindopril_mpo --methods cowboys nflow --seeds 1 2 3 4 5 --stride 10
-python reports/plot_iteration_metrics.py --problem ranolazine_mpo --methods cowboys nflow --seeds 1 2 3 4 5 --stride 10
-python reports/plot_iteration_metrics.py --problem zaleplon_mpo --methods cowboys nflow --seeds 1 2 3 4 5 --stride 10
+python reports/plot_iteration_metrics.py --problem zaleplon_mpo --methods cowboys nflow dgbo --stride 10
+python reports/plot_iteration_metrics.py --problems all --methods cowboys nflow dgbo --stride 10
+python reports/plot_iteration_metrics.py --problems osimetrinib_mpo median_2 amlodipine_mpo --methods dgbo nflow3 cowboys --folders gs10_clip20_dgbo_iteration new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration --seeds 1 2 3 4 5 --stride 10
+python reports/plot_iteration_metrics.py --problems all --folders gs10_clip20_dgbo_iteration new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration --methods dgbo nflow3 cowboys --seeds 1 2 3 4 5 --stride 10
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+from string import ascii_lowercase
 from typing import Iterable
 
 import matplotlib
@@ -39,11 +38,13 @@ DEFAULT_FIGURE_FORMATS = ("png", "pdf")
 METHOD_LABELS = {
     "cowboys": "COWBOYS",
     "cowboys_flow": "NFlow",
+    "cowboys_flow_2": "NFlow 3",
     "cowboys_diffusion": "DGBO",
 }
 
 METHOD_ALIASES = {
     "cowboys_flow": {"nflow"},
+    "cowboys_flow_2": {"nflow3"},
     "cowboys_diffusion": {"dgbo"},
 }
 
@@ -86,12 +87,11 @@ METRICS = (
         yformatter="{x:.3f}",
     ),
     MetricSpec(
-        key="sample_unique_decoded_molecules_in_iteration",
-        title="Distinct Valid Molecules",
-        ylabel="Distinct decoded molecules in iteration",
-        filename="plot_3_distinct_valid_molecules",
-        ymin=0.0,
-        yformatter="{x:.0f}",
+        key="mean_available_unique_top_10_candidate_objective",
+        title="Mean Objective of Available Unique Top-k Candidates (k<=10)",
+        ylabel="Mean objective of available unique top-k candidates",
+        filename="plot_3_mean_available_unique_top_k_candidate_objective",
+        yformatter="{x:.3f}",
     ),
 )
 
@@ -119,6 +119,13 @@ class AggregatedSeries:
     mean: np.ndarray
     std: np.ndarray
     n_runs: int
+
+
+@dataclass
+class PreparedProblemData:
+    problem: str
+    seeds: list[int]
+    aggregates: dict[str, dict[str, AggregatedSeries]]
 
 
 def positive_int(value: str) -> int:
@@ -155,11 +162,15 @@ def iter_iteration_folders(results_dir: Path) -> Iterable[Path]:
             yield path
 
 
-def iter_iteration_result_files(folder: Path) -> Iterable[Path]:
+def iter_folder_files(folder: Path, suffix: str) -> Iterable[Path]:
     with os.scandir(to_long_path(folder)) as entries:
         for entry in sorted(entries, key=lambda item: item.name):
-            if entry.is_file() and entry.name.endswith(RESULT_FILE_SUFFIX):
+            if entry.is_file() and entry.name.endswith(suffix):
                 yield folder / entry.name
+
+
+def iter_iteration_result_files(folder: Path) -> Iterable[Path]:
+    yield from iter_folder_files(folder, RESULT_FILE_SUFFIX)
 
 
 def read_json(path: Path) -> dict:
@@ -167,9 +178,27 @@ def read_json(path: Path) -> dict:
         return json.load(handle)
 
 
-def build_method_config(folder: Path) -> MethodConfig | None:
+def missing_iteration_results_message(folder: Path) -> str:
+    status_files = list(iter_folder_files(folder, "_status.json"))
+    if status_files:
+        sample_status = read_json(status_files[0])
+        if sample_status.get("iteration_results_enabled") is False:
+            return (
+                f"Folder '{folder.name}' has no '{RESULT_FILE_SUFFIX}' files. "
+                "Its status files report 'iteration_results_enabled=false', "
+                "so the required iteration metrics were never written."
+            )
+
+    return f"Folder '{folder.name}' has no '{RESULT_FILE_SUFFIX}' files."
+
+
+def build_method_config(
+    folder: Path, *, require_iteration_results: bool = False
+) -> MethodConfig | None:
     files = list(iter_iteration_result_files(folder))
     if not files:
+        if require_iteration_results:
+            raise FileNotFoundError(missing_iteration_results_message(folder))
         return None
 
     sample = read_json(files[0])
@@ -190,12 +219,42 @@ def build_method_config(folder: Path) -> MethodConfig | None:
     )
 
 
-def discover_methods(results_dir: Path) -> list[MethodConfig]:
+def resolve_iteration_folders(
+    results_dir: Path, requested_folders: list[str] | None
+) -> list[Path]:
+    available_folders = {folder.name: folder for folder in iter_iteration_folders(results_dir)}
+    if not available_folders:
+        raise FileNotFoundError(
+            f"No iteration result folders were found under '{results_dir}'."
+        )
+
+    if not requested_folders:
+        return list(available_folders.values())
+
+    missing_folders = [
+        folder_name for folder_name in requested_folders if folder_name not in available_folders
+    ]
+    if missing_folders:
+        available = ", ".join(sorted(available_folders))
+        missing = ", ".join(missing_folders)
+        raise ValueError(
+            f"Unknown folder(s): {missing}. Available iteration folders: {available}."
+        )
+
+    return [available_folders[folder_name] for folder_name in requested_folders]
+
+
+def discover_methods(
+    results_dir: Path, requested_folders: list[str] | None = None
+) -> list[MethodConfig]:
     methods = [
         method
         for method in (
-            build_method_config(folder)
-            for folder in iter_iteration_folders(results_dir)
+            build_method_config(
+                folder,
+                require_iteration_results=requested_folders is not None,
+            )
+            for folder in resolve_iteration_folders(results_dir, requested_folders)
         )
         if method is not None
     ]
@@ -386,6 +445,75 @@ def aggregate_metric(
     return aggregated
 
 
+def configure_metric_axis(
+    axis: plt.Axes,
+    metric: MetricSpec,
+    *,
+    show_xlabel: bool,
+    show_ylabel: bool,
+) -> None:
+    axis.set_xlabel("BO iteration" if show_xlabel else "")
+    axis.set_ylabel(metric.ylabel if show_ylabel else "")
+    axis.set_xlim(left=1)
+
+    if metric.ymin is not None:
+        _, ymax = axis.get_ylim()
+        axis.set_ylim(bottom=metric.ymin, top=ymax)
+
+    if metric.yformatter is not None:
+        axis.yaxis.set_major_formatter(StrMethodFormatter(metric.yformatter))
+
+    axis.xaxis.set_major_locator(MaxNLocator(integer=True, nbins=8))
+    axis.grid(axis="y", linewidth=0.9)
+    axis.grid(axis="x", linewidth=0.5, alpha=0.4)
+    axis.set_axisbelow(True)
+
+    axis.spines["top"].set_visible(False)
+    axis.spines["right"].set_visible(False)
+    axis.spines["left"].set_color("#9A9A92")
+    axis.spines["bottom"].set_color("#9A9A92")
+
+
+def plot_metric_series(
+    axis: plt.Axes,
+    metric: MetricSpec,
+    methods: list[MethodConfig],
+    aggregated: dict[str, AggregatedSeries],
+    *,
+    show_xlabel: bool,
+    show_ylabel: bool,
+) -> None:
+    for index, method in enumerate(methods):
+        series = aggregated.get(method.solver_name)
+        if series is None:
+            continue
+
+        color = COLOR_CYCLE[index % len(COLOR_CYCLE)]
+        axis.plot(
+            series.iterations,
+            series.mean,
+            color=color,
+            linewidth=2.4,
+            label=method.label,
+            solid_capstyle="round",
+        )
+        axis.fill_between(
+            series.iterations,
+            series.mean - series.std,
+            series.mean + series.std,
+            color=color,
+            alpha=0.16,
+            linewidth=0,
+        )
+
+    configure_metric_axis(
+        axis,
+        metric,
+        show_xlabel=show_xlabel,
+        show_ylabel=show_ylabel,
+    )
+
+
 def configure_matplotlib() -> None:
     plt.rcParams.update(
         {
@@ -418,29 +546,14 @@ def save_metric_plot(
     seeds: list[int],
 ) -> list[Path]:
     figure, axis = plt.subplots(figsize=(8.2, 4.9))
-
-    for index, method in enumerate(methods):
-        series = aggregated.get(method.solver_name)
-        if series is None:
-            continue
-
-        color = COLOR_CYCLE[index % len(COLOR_CYCLE)]
-        axis.plot(
-            series.iterations,
-            series.mean,
-            color=color,
-            linewidth=2.4,
-            label=method.label,
-            solid_capstyle="round",
-        )
-        axis.fill_between(
-            series.iterations,
-            series.mean - series.std,
-            series.mean + series.std,
-            color=color,
-            alpha=0.16,
-            linewidth=0,
-        )
+    plot_metric_series(
+        axis,
+        metric,
+        methods,
+        aggregated,
+        show_xlabel=True,
+        show_ylabel=True,
+    )
 
     axis.set_title(metric.title, loc="left", pad=14)
     axis.text(
@@ -453,26 +566,6 @@ def save_metric_plot(
         fontsize=10,
         color="#66665F",
     )
-    axis.set_xlabel("BO iteration")
-    axis.set_ylabel(metric.ylabel)
-    axis.set_xlim(left=1)
-
-    if metric.ymin is not None:
-        _, ymax = axis.get_ylim()
-        axis.set_ylim(bottom=metric.ymin, top=ymax)
-
-    if metric.yformatter is not None:
-        axis.yaxis.set_major_formatter(StrMethodFormatter(metric.yformatter))
-
-    axis.xaxis.set_major_locator(MaxNLocator(integer=True, nbins=8))
-    axis.grid(axis="y", linewidth=0.9)
-    axis.grid(axis="x", linewidth=0.5, alpha=0.4)
-    axis.set_axisbelow(True)
-
-    axis.spines["top"].set_visible(False)
-    axis.spines["right"].set_visible(False)
-    axis.spines["left"].set_color("#9A9A92")
-    axis.spines["bottom"].set_color("#9A9A92")
 
     legend = axis.legend(
         loc="upper left",
@@ -510,16 +603,149 @@ def save_metric_plot(
     return output_paths
 
 
+def build_summary_footer(
+    prepared_problem_data: list[PreparedProblemData],
+    stride: int,
+) -> str:
+    unique_seed_sets = {tuple(problem_data.seeds) for problem_data in prepared_problem_data}
+    if len(unique_seed_sets) == 1:
+        seed_text = f"Seeds: {', '.join(map(str, prepared_problem_data[0].seeds))}"
+    else:
+        seed_text = "Seeds: per-problem common seeds across methods"
+
+    return (
+        f"{seed_text}"
+        f"   |   Every {stride} iteration(s)"
+        f"   |   Full-seed iterations only"
+    )
+
+
+def save_metric_summary_grid(
+    metric: MetricSpec,
+    methods: list[MethodConfig],
+    prepared_problem_data: list[PreparedProblemData],
+    output_dir: Path,
+    formats: tuple[str, ...],
+    stride: int,
+) -> list[Path]:
+    n_problems = len(prepared_problem_data)
+    n_cols = 1 if n_problems == 1 else 2
+    n_rows = math.ceil(n_problems / n_cols)
+    figure, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(6.6 * n_cols, 3.8 * n_rows + 1.0),
+        squeeze=False,
+    )
+
+    for idx, problem_data in enumerate(prepared_problem_data):
+        row, col = divmod(idx, n_cols)
+        axis = axes[row][col]
+        plot_metric_series(
+            axis,
+            metric,
+            methods,
+            problem_data.aggregates[metric.key],
+            show_xlabel=row == n_rows - 1,
+            show_ylabel=col == 0,
+        )
+        panel_letter = ascii_lowercase[idx] if idx < len(ascii_lowercase) else f"p{idx + 1}"
+        axis.set_title(
+            f"({panel_letter}) {prettify_name(problem_data.problem)}",
+            loc="left",
+            pad=10,
+            fontsize=14,
+        )
+
+    for idx in range(n_problems, n_rows * n_cols):
+        axes.flat[idx].set_visible(False)
+
+    handles, labels = axes.flat[0].get_legend_handles_labels()
+    if handles:
+        figure.legend(
+            handles,
+            labels,
+            loc="lower center",
+            ncol=min(4, len(methods)),
+            frameon=False,
+            bbox_to_anchor=(0.5, 0.035),
+            handlelength=2.4,
+            columnspacing=1.2,
+        )
+
+    figure.suptitle(metric.title, x=0.07, y=0.985, ha="left", fontsize=18)
+    figure.text(
+        0.5,
+        0.085,
+        build_summary_footer(prepared_problem_data, stride),
+        ha="center",
+        va="center",
+        fontsize=10,
+        color="#6C6C66",
+    )
+    figure.tight_layout(rect=(0.03, 0.12, 0.995, 0.95))
+
+    summary_dir = output_dir / "_summary"
+    summary_dir.mkdir(parents=True, exist_ok=True)
+
+    output_paths: list[Path] = []
+    for file_format in formats:
+        destination = (
+            summary_dir
+            / f"summary_{len(prepared_problem_data)}_problems_{metric.filename}.{file_format}"
+        )
+        figure.savefig(destination, dpi=400, bbox_inches="tight")
+        output_paths.append(destination)
+
+    plt.close(figure)
+    return output_paths
+
+
 def print_available_options(methods: list[MethodConfig], runs: list[RunRecord]) -> None:
     problems = sorted({run.function_name for run in runs})
     print("Available problems:")
     for problem in problems:
         print(f"  - {problem}")
 
+    print("\nFolders with iteration JSONs:")
+    for method in methods:
+        print(f"  - {method.folder.name}")
+
     print("\nAvailable methods:")
     for method in methods:
         alias_text = ", ".join(sorted(method.aliases))
-        print(f"  - {method.solver_name} ({method.label}) [{alias_text}]")
+        print(
+            f"  - {method.solver_name} ({method.label}) "
+            f"[{alias_text}] from {method.folder.name}"
+        )
+
+
+def resolve_selected_problems(
+    requested_problem: str | None,
+    requested_problems: list[str] | None,
+    available_problems: set[str],
+) -> list[str]:
+    if requested_problem and requested_problems:
+        raise ValueError("Use either --problem or --problems, not both.")
+
+    if requested_problems:
+        if len(requested_problems) == 1 and normalize_token(requested_problems[0]) == "all":
+            return sorted(available_problems)
+        selected = list(dict.fromkeys(requested_problems))
+    elif requested_problem:
+        selected = [requested_problem]
+    else:
+        return []
+
+    missing = [problem for problem in selected if problem not in available_problems]
+    if missing:
+        available = ", ".join(sorted(available_problems))
+        missing_text = ", ".join(missing)
+        raise ValueError(
+            f"Problem(s) '{missing_text}' were not found. Available problems: {available}"
+        )
+
+    return selected
 
 
 def parse_args() -> argparse.Namespace:
@@ -541,12 +767,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--problem",
         type=str,
-        help="Problem/function name to plot, for example 'osimetrinib_mpo'.",
+        help="Single problem/function name to plot, for example 'osimetrinib_mpo'.",
+    )
+    parser.add_argument(
+        "--problems",
+        nargs="+",
+        help="One or more problems to plot together. Use 'all' to include every available problem.",
     )
     parser.add_argument(
         "--methods",
         nargs="+",
-        help="Optional subset of methods to compare. Accepts aliases like 'cowboys', 'nflow', and 'dgbo'.",
+        help="Optional subset of methods to compare. Accepts aliases like 'cowboys', 'nflow', 'nflow3', and 'dgbo'.",
+    )
+    parser.add_argument(
+        "--folders",
+        nargs="+",
+        help="Optional exact result folder names under results/ to use for this comparison.",
     )
     parser.add_argument(
         "--seeds",
@@ -584,62 +820,91 @@ def main() -> int:
     args = parse_args()
     configure_matplotlib()
 
-    methods = discover_methods(args.results_dir)
+    methods = discover_methods(args.results_dir, args.folders)
     selected_methods = resolve_methods(args.methods, methods)
     runs = load_runs(selected_methods)
+    available_problems = {run.function_name for run in runs}
+    selected_problem_names = resolve_selected_problems(
+        args.problem,
+        args.problems,
+        available_problems,
+    )
 
-    if args.list_problems or not args.problem:
+    if args.list_problems or not selected_problem_names:
         print_available_options(selected_methods, runs)
-        if not args.problem:
+        if not selected_problem_names:
             return 0
 
-    available_problems = {run.function_name for run in runs}
-    if args.problem not in available_problems:
-        available = ", ".join(sorted(available_problems))
-        raise ValueError(
-            f"Problem '{args.problem}' was not found. Available problems: {available}"
-        )
-
-    problem_runs = [run for run in runs if run.function_name == args.problem]
-    selected_seeds = choose_seeds(
-        runs=problem_runs,
-        methods=selected_methods,
-        explicit_seeds=args.seeds,
-        seed_policy=args.seed_policy,
-    )
-    filtered_runs = [run for run in problem_runs if run.seed in selected_seeds]
-
-    if not filtered_runs:
-        raise ValueError("No runs matched the chosen problem, methods, and seeds.")
-
-    output_dir = args.output_dir / args.problem
-    output_dir.mkdir(parents=True, exist_ok=True)
-
+    prepared_problem_data: list[PreparedProblemData] = []
     saved_paths: list[Path] = []
-    for metric in METRICS:
-        aggregated = aggregate_metric(
-            runs=filtered_runs,
+    for problem_name in selected_problem_names:
+        problem_runs = [run for run in runs if run.function_name == problem_name]
+        selected_seeds = choose_seeds(
+            runs=problem_runs,
             methods=selected_methods,
-            metric_key=metric.key,
-            stride=args.stride,
+            explicit_seeds=args.seeds,
+            seed_policy=args.seed_policy,
         )
-        saved_paths.extend(
-            save_metric_plot(
-                problem=args.problem,
-                metric=metric,
+        filtered_runs = [run for run in problem_runs if run.seed in selected_seeds]
+
+        if not filtered_runs:
+            raise ValueError(
+                f"No runs matched the chosen problem, methods, and seeds for '{problem_name}'."
+            )
+
+        output_dir = args.output_dir / problem_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        aggregates_for_problem: dict[str, dict[str, AggregatedSeries]] = {}
+        for metric in METRICS:
+            aggregated = aggregate_metric(
+                runs=filtered_runs,
                 methods=selected_methods,
-                aggregated=aggregated,
-                output_dir=output_dir,
-                formats=tuple(args.formats),
+                metric_key=metric.key,
                 stride=args.stride,
+            )
+            aggregates_for_problem[metric.key] = aggregated
+            saved_paths.extend(
+                save_metric_plot(
+                    problem=problem_name,
+                    metric=metric,
+                    methods=selected_methods,
+                    aggregated=aggregated,
+                    output_dir=output_dir,
+                    formats=tuple(args.formats),
+                    stride=args.stride,
+                    seeds=selected_seeds,
+                )
+            )
+
+        prepared_problem_data.append(
+            PreparedProblemData(
+                problem=problem_name,
                 seeds=selected_seeds,
+                aggregates=aggregates_for_problem,
             )
         )
 
-    print(f"Problem: {args.problem}")
+    if len(prepared_problem_data) > 1:
+        for metric in METRICS:
+            saved_paths.extend(
+                save_metric_summary_grid(
+                    metric=metric,
+                    methods=selected_methods,
+                    prepared_problem_data=prepared_problem_data,
+                    output_dir=args.output_dir,
+                    formats=tuple(args.formats),
+                    stride=args.stride,
+                )
+            )
+
+    print(f"Problems: {', '.join(selected_problem_names)}")
     print(f"Methods: {', '.join(method.label for method in selected_methods)}")
-    print(f"Seeds: {', '.join(map(str, selected_seeds))}")
-    print(f"Output directory: {output_dir}")
+    for problem_data in prepared_problem_data:
+        print(f"Seeds for {problem_data.problem}: {', '.join(map(str, problem_data.seeds))}")
+    print(f"Base output directory: {args.output_dir}")
+    if len(prepared_problem_data) > 1:
+        print(f"Summary directory: {args.output_dir / '_summary'}")
     print("Saved figures:")
     for path in saved_paths:
         print(f"  - {path}")

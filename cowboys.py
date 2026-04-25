@@ -2,7 +2,7 @@
 This module provides functionality to run COWBOYS
 """
 
-from typing import Tuple, Type
+from typing import Any, Tuple, Type
 
 import numpy as np
 import torch
@@ -20,6 +20,10 @@ import selfies as sf
 from gauche.kernels.fingerprint_kernels import TanimotoKernel
 from gpytorch.kernels import ScaleKernel
 from hdbo_benchmark.utils.experiments.normalization import from_unit_cube_to_range
+from hdbo_benchmark.utils.logging.candidate_diagnostics import (
+    TOP_K_CANDIDATES,
+    build_top_candidate_diagnostics,
+)
 import gpytorch
 
 import warnings
@@ -73,6 +77,7 @@ class COWBOYS(BaseBayesianOptimization):
         self.n_steps = 100 # minimum number of MCMC steps
         self.betas = torch.tensor([0.1]).to(dtype=torch.float64, device=self.device)[None,:].repeat(self.num_chains,1) # keep track of beta param for each MCMC chain
         self.iteration_sampling_metrics_history: list[dict[str, int]] = []
+        self.iteration_candidate_diagnostics_history: list[dict[str, Any]] = []
         self._seen_sampled_decoded_structures: set[str] = set()
 
     def _fit_model(
@@ -198,6 +203,14 @@ class COWBOYS(BaseBayesianOptimization):
         # filter the unique samples found so far if there are more than than desired using EI heuristic
         fingerprints_samples =  self.selfies_list_to_fingerprint_tensors(selfies_samples)
         acq = qLogExpectedImprovement(model, best_f=best_so_far)
+        ranked_diagnostic_candidates = self._build_ranked_diagnostic_candidates(
+            candidate_latents=s_samples,
+            candidate_structures=selfies_samples,
+            candidate_features=fingerprints_samples,
+            acquisition=acq,
+            observed_structures=prev_selfies,
+        )
+        self._record_top_candidate_diagnostics(ranked_diagnostic_candidates)
         fingerprints_chosen_for_model, _ = optimize_acqf_discrete(acq, min(self.batch_size, len(selfies_samples)), fingerprints_samples, max_batch_size=1_000)
         chosen_idx = [fingerprints_samples.tolist().index(x) for x in fingerprints_chosen_for_model.tolist()]
         return s_samples[chosen_idx].cpu().numpy()
@@ -230,6 +243,90 @@ class COWBOYS(BaseBayesianOptimization):
                 out[i, k % 2048] += v
 
         return torch.tensor(out).to(dtype=torch.float64, device=self.device)
+
+    def _build_ranked_diagnostic_candidates(
+        self,
+        candidate_latents: torch.Tensor,
+        candidate_structures: list[str],
+        candidate_features: torch.Tensor,
+        acquisition: qLogExpectedImprovement,
+        observed_structures: list[str],
+    ) -> list[dict[str, Any]]:
+        if candidate_latents.numel() == 0 or not candidate_structures:
+            return []
+
+        with torch.no_grad():
+            selection_scores = acquisition(candidate_features[:, None, :]).view(-1)
+        selection_scores = torch.nan_to_num(
+            selection_scores,
+            nan=-1e8,
+            neginf=-1e8,
+            posinf=0.0,
+        )
+
+        ranked_indices = torch.argsort(selection_scores, descending=True).tolist()
+        ranked_candidates: list[dict[str, Any]] = []
+        seen_molecules = {
+            canonical_smiles
+            for structure in observed_structures
+            if (canonical_smiles := self._canonical_smiles(structure)) is not None
+        }
+
+        for idx in ranked_indices:
+            structure = candidate_structures[idx]
+            canonical_smiles = self._canonical_smiles(structure)
+            if canonical_smiles is None:
+                continue
+            if canonical_smiles in seen_molecules:
+                continue
+
+            seen_molecules.add(canonical_smiles)
+            ranked_candidates.append(
+                {
+                    "source": "mcmc",
+                    "structure": structure,
+                    "canonical_smiles": canonical_smiles,
+                    "selection_score": float(selection_scores[idx].detach().cpu().item()),
+                    "unit_latent": candidate_latents[idx].detach().cpu().numpy().tolist(),
+                }
+            )
+
+        return ranked_candidates
+
+    def _record_top_candidate_diagnostics(
+        self,
+        ranked_candidates: list[dict[str, Any]],
+    ) -> None:
+        try:
+            diagnostics = build_top_candidate_diagnostics(
+                self.black_box,
+                ranked_candidates,
+                top_k=TOP_K_CANDIDATES,
+            )
+        except Exception as exc:
+            print(f"Warning: could not evaluate top-k diagnostic candidates: {exc}")
+            diagnostics = {
+                "top_k": int(TOP_K_CANDIDATES),
+                "available_unique_top_10_candidate_count": 0,
+                "mean_available_unique_top_10_candidate_objective": np.nan,
+                "top_candidates": [],
+            }
+
+        diagnostics["iteration"] = len(self.iteration_candidate_diagnostics_history) + 1
+        self.iteration_candidate_diagnostics_history.append(diagnostics)
+
+    def _selfies_to_mol(self, structure: str):
+        try:
+            smiles = sf.decoder(structure)
+        except Exception:
+            return None
+        return Chem.MolFromSmiles(smiles)
+
+    def _canonical_smiles(self, structure: str) -> str | None:
+        mol = self._selfies_to_mol(structure)
+        if mol is None:
+            return None
+        return Chem.MolToSmiles(mol, canonical=True)
 
     def _record_sampling_metrics(
         self,
