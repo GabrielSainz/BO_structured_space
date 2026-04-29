@@ -10,6 +10,7 @@ from rdkit.Chem import rdMolDescriptors
 from hdbo_benchmark.utils.logging.candidate_diagnostics import (
     TOP_K_COUNT_METRIC,
     TOP_K_MEAN_OBJECTIVE_METRIC,
+    build_top_candidate_diagnostics,
 )
 
 
@@ -19,6 +20,7 @@ def build_iteration_metric_artifacts(
     history_y: np.ndarray,
     initial_history_size: int,
     completed_iterations: int,
+    evaluate_top_candidate_objectives: bool = True,
 ) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
     history_x = np.asarray(history_x, dtype=float)
     history_y = np.asarray(history_y, dtype=float).reshape(-1)
@@ -137,6 +139,21 @@ def build_iteration_metric_artifacts(
             if iteration_offset < len(top_candidate_metric_history)
             else {}
         )
+        if (
+            evaluate_top_candidate_objectives
+            and top_candidate_metrics_for_iteration.get("top_candidates")
+        ):
+            top_candidate_metrics_for_iteration = build_top_candidate_diagnostics(
+                solver.black_box,
+                top_candidate_metrics_for_iteration["top_candidates"],
+                top_k=int(
+                    top_candidate_metrics_for_iteration.get(
+                        "top_k",
+                        len(top_candidate_metrics_for_iteration["top_candidates"]),
+                    )
+                ),
+                evaluate_objectives=True,
+            )
         for metric_name in top_candidate_metric_names:
             if metric_name not in series:
                 continue

@@ -37,6 +37,7 @@ from hdbo_benchmark.utils.experiments.normalization import (
 from hdbo_benchmark.utils.logging.candidate_diagnostics import (
     TOP_K_CANDIDATES,
     build_top_candidate_diagnostics,
+    preserve_rng_state,
 )
 
 warnings.filterwarnings("ignore", message=".*contained to the unit cube")
@@ -788,14 +789,14 @@ class COWBOYSFlow(BaseBayesianOptimization):
         candidate_features = self._structures_to_feature_tensors(
             [candidate["structure"] for candidate in unique_metadata]
         )
-        selection_scores = self._evaluate_selection_scores(candidate_features, bo_state)
-        ranked_diagnostic_candidates = self._build_ranked_candidate_diagnostics(
-            stacked_latents,
-            unique_metadata,
-            selection_scores,
-            bo_state.observed_structures,
-        )
         if stacked_latents.shape[0] <= self.batch_size:
+            selection_scores = self._evaluate_selection_scores(candidate_features, bo_state)
+            ranked_diagnostic_candidates = self._build_ranked_candidate_diagnostics(
+                stacked_latents,
+                unique_metadata,
+                selection_scores,
+                bo_state.observed_structures,
+            )
             return stacked_latents, unique_metadata, ranked_diagnostic_candidates
 
         acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
@@ -806,6 +807,13 @@ class COWBOYSFlow(BaseBayesianOptimization):
             max_batch_size=1_000,
         )
         chosen_indices = self._match_selected_features(candidate_features, chosen_features)
+        selection_scores = self._evaluate_selection_scores(candidate_features, bo_state)
+        ranked_diagnostic_candidates = self._build_ranked_candidate_diagnostics(
+            stacked_latents,
+            unique_metadata,
+            selection_scores,
+            bo_state.observed_structures,
+        )
         return (
             stacked_latents[chosen_indices],
             [unique_metadata[idx].copy() for idx in chosen_indices],
@@ -835,9 +843,10 @@ class COWBOYSFlow(BaseBayesianOptimization):
         candidate_features: torch.Tensor,
         bo_state: StructuredBOState,
     ) -> torch.Tensor:
-        acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
-        with torch.no_grad():
-            selection_scores = acquisition(candidate_features[:, None, :]).view(-1)
+        with preserve_rng_state():
+            acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
+            with torch.no_grad():
+                selection_scores = acquisition(candidate_features[:, None, :]).view(-1)
         return torch.nan_to_num(
             selection_scores,
             nan=self.min_log_value,
@@ -892,9 +901,10 @@ class COWBOYSFlow(BaseBayesianOptimization):
                 self.black_box,
                 ranked_candidates,
                 top_k=TOP_K_CANDIDATES,
+                evaluate_objectives=False,
             )
         except Exception as exc:
-            print(f"Warning: could not evaluate top-k diagnostic candidates: {exc}")
+            print(f"Warning: could not record top-k diagnostic candidates: {exc}")
             diagnostics = {
                 "top_k": int(TOP_K_CANDIDATES),
                 "available_unique_top_10_candidate_count": 0,

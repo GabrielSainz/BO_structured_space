@@ -71,7 +71,7 @@ def compute_npy_group_stats(folder):
     return results
 
 
-folder = "results/new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration"
+folder = "results/new_vae_10_chain_100_steps_with_stoch_sampling_3"
 stats = compute_npy_group_stats(folder)
 
 for name, res in stats.items():

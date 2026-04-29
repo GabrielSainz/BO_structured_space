@@ -23,6 +23,7 @@ from hdbo_benchmark.utils.experiments.normalization import from_unit_cube_to_ran
 from hdbo_benchmark.utils.logging.candidate_diagnostics import (
     TOP_K_CANDIDATES,
     build_top_candidate_diagnostics,
+    preserve_rng_state,
 )
 import gpytorch
 
@@ -203,6 +204,8 @@ class COWBOYS(BaseBayesianOptimization):
         # filter the unique samples found so far if there are more than than desired using EI heuristic
         fingerprints_samples =  self.selfies_list_to_fingerprint_tensors(selfies_samples)
         acq = qLogExpectedImprovement(model, best_f=best_so_far)
+        fingerprints_chosen_for_model, _ = optimize_acqf_discrete(acq, min(self.batch_size, len(selfies_samples)), fingerprints_samples, max_batch_size=1_000)
+        chosen_idx = [fingerprints_samples.tolist().index(x) for x in fingerprints_chosen_for_model.tolist()]
         ranked_diagnostic_candidates = self._build_ranked_diagnostic_candidates(
             candidate_latents=s_samples,
             candidate_structures=selfies_samples,
@@ -211,8 +214,6 @@ class COWBOYS(BaseBayesianOptimization):
             observed_structures=prev_selfies,
         )
         self._record_top_candidate_diagnostics(ranked_diagnostic_candidates)
-        fingerprints_chosen_for_model, _ = optimize_acqf_discrete(acq, min(self.batch_size, len(selfies_samples)), fingerprints_samples, max_batch_size=1_000)
-        chosen_idx = [fingerprints_samples.tolist().index(x) for x in fingerprints_chosen_for_model.tolist()]
         return s_samples[chosen_idx].cpu().numpy()
 
 
@@ -255,8 +256,9 @@ class COWBOYS(BaseBayesianOptimization):
         if candidate_latents.numel() == 0 or not candidate_structures:
             return []
 
-        with torch.no_grad():
-            selection_scores = acquisition(candidate_features[:, None, :]).view(-1)
+        with preserve_rng_state():
+            with torch.no_grad():
+                selection_scores = acquisition(candidate_features[:, None, :]).view(-1)
         selection_scores = torch.nan_to_num(
             selection_scores,
             nan=-1e8,
@@ -302,9 +304,10 @@ class COWBOYS(BaseBayesianOptimization):
                 self.black_box,
                 ranked_candidates,
                 top_k=TOP_K_CANDIDATES,
+                evaluate_objectives=False,
             )
         except Exception as exc:
-            print(f"Warning: could not evaluate top-k diagnostic candidates: {exc}")
+            print(f"Warning: could not record top-k diagnostic candidates: {exc}")
             diagnostics = {
                 "top_k": int(TOP_K_CANDIDATES),
                 "available_unique_top_10_candidate_count": 0,

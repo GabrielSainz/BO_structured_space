@@ -36,6 +36,7 @@ from hdbo_benchmark.utils.experiments.normalization import from_range_to_unit_cu
 from hdbo_benchmark.utils.logging.candidate_diagnostics import (
     TOP_K_CANDIDATES,
     build_top_candidate_diagnostics,
+    preserve_rng_state,
 )
 
 try:
@@ -518,19 +519,26 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         unique_features = fingerprints[unique_indices]
         unique_log_weight = log_weight[unique_indices]
         unique_structures = [structures[idx] for idx in unique_indices]
-        selection_scores = self._evaluate_selection_scores(unique_features, bo_state)
-        ranked_diagnostic_candidates = self._build_ranked_candidate_diagnostics(
-            unique_latents,
-            unique_structures,
-            selection_scores,
-            bo_state.observed_structures,
-        )
 
         if unique_latents.shape[0] <= self.batch_size:
+            selection_scores = self._evaluate_selection_scores(unique_features, bo_state)
+            ranked_diagnostic_candidates = self._build_ranked_candidate_diagnostics(
+                unique_latents,
+                unique_structures,
+                selection_scores,
+                bo_state.observed_structures,
+            )
             return unique_latents, ranked_diagnostic_candidates
 
         if self.batch_size == 1:
             best_idx = int(torch.argmax(unique_log_weight).item())
+            selection_scores = self._evaluate_selection_scores(unique_features, bo_state)
+            ranked_diagnostic_candidates = self._build_ranked_candidate_diagnostics(
+                unique_latents,
+                unique_structures,
+                selection_scores,
+                bo_state.observed_structures,
+            )
             return unique_latents[best_idx : best_idx + 1], ranked_diagnostic_candidates
 
         acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
@@ -541,6 +549,13 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
             max_batch_size=1_000,
         )
         chosen_indices = self._match_selected_features(unique_features, chosen_features)
+        selection_scores = self._evaluate_selection_scores(unique_features, bo_state)
+        ranked_diagnostic_candidates = self._build_ranked_candidate_diagnostics(
+            unique_latents,
+            unique_structures,
+            selection_scores,
+            bo_state.observed_structures,
+        )
         return unique_latents[chosen_indices], ranked_diagnostic_candidates
 
     def _evaluate_selection_scores(
@@ -548,9 +563,10 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
         candidate_features: torch.Tensor,
         bo_state: StructuredBOState,
     ) -> torch.Tensor:
-        acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
-        with torch.no_grad():
-            selection_scores = acquisition(candidate_features[:, None, :]).view(-1)
+        with preserve_rng_state():
+            acquisition = qLogExpectedImprovement(bo_state.model, best_f=bo_state.best_y)
+            with torch.no_grad():
+                selection_scores = acquisition(candidate_features[:, None, :]).view(-1)
         return torch.nan_to_num(
             selection_scores,
             nan=self.min_log_value,
@@ -606,9 +622,10 @@ class COWBOYSDiffusion(BaseBayesianOptimization):
                 self.black_box,
                 ranked_candidates,
                 top_k=TOP_K_CANDIDATES,
+                evaluate_objectives=False,
             )
         except Exception as exc:
-            print(f"Warning: could not evaluate top-k diagnostic candidates: {exc}")
+            print(f"Warning: could not record top-k diagnostic candidates: {exc}")
             diagnostics = {
                 "top_k": int(TOP_K_CANDIDATES),
                 "available_unique_top_10_candidate_count": 0,

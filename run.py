@@ -134,6 +134,7 @@ def _save_solver_progress(
                             history_y=np.asarray(history_y),
                             initial_history_size=initial_history_size,
                             completed_iterations=completed_iterations,
+                            evaluate_top_candidate_objectives=status != "running",
                         )
                     )
                     history_payload.update(iteration_series)
