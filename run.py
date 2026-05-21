@@ -8,6 +8,7 @@ please refer to the README.md.
 # mypy: disable-error-code="import-untyped"
 import json
 import os
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -48,6 +49,7 @@ ITERATION_METRIC_SOLVERS = {
     "cowboys_flow",
     "cowboys_flow_2",
     "cowboys_diffusion",
+    "lsbo",
 }
 
 
@@ -88,6 +90,45 @@ def _path_for_io(path: Path) -> str | Path:
     return "\\\\?\\" + path_str
 
 
+def _write_with_retries(
+    path: Path,
+    writer,
+    description: str,
+    attempts: int = 6,
+) -> bool:
+    """Write through a temporary file, retrying transient Windows file locks."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    last_error: Exception | None = None
+
+    for attempt in range(1, attempts + 1):
+        tmp_path = path.with_name(
+            f".{path.stem}.{os.getpid()}.{uuid4().hex}{path.suffix}"
+        )
+        try:
+            writer(tmp_path)
+            os.replace(_path_for_io(tmp_path), _path_for_io(path))
+            return True
+        except (PermissionError, OSError) as exc:
+            last_error = exc
+            try:
+                if tmp_path.exists():
+                    tmp_path.unlink()
+            except OSError:
+                pass
+
+            if attempt == attempts:
+                break
+            time.sleep(min(0.25 * attempt, 2.0))
+
+    print(f"Warning: could not write {description} to {path}: {last_error}")
+    return False
+
+
+def _write_json(path: Path, payload: dict) -> None:
+    with open(_path_for_io(path), "w", encoding="utf-8") as fp:
+        json.dump(payload, fp, indent=2)
+
+
 def _save_solver_progress(
     solver,
     output_dir: Path,
@@ -103,8 +144,11 @@ def _save_solver_progress(
 
     best_performance = np.asarray(solver.get_best_performance())
     best_path = output_dir / f"{solver_name}_{function_name}_{seed}.npy"
-    best_path.parent.mkdir(parents=True, exist_ok=True)
-    np.save(_path_for_io(best_path), best_performance)
+    _write_with_retries(
+        best_path,
+        lambda tmp_path: np.save(_path_for_io(tmp_path), best_performance),
+        "best performance checkpoint",
+    )
     history_path = output_dir / f"{solver_name}_{function_name}_{seed}_history.npz"
     iteration_results_path = (
         output_dir / f"{solver_name}_{function_name}_{seed}_iteration_results.json"
@@ -138,29 +182,31 @@ def _save_solver_progress(
                         )
                     )
                     history_payload.update(iteration_series)
-                    iteration_results_path.parent.mkdir(parents=True, exist_ok=True)
-                    with open(
-                        _path_for_io(iteration_results_path),
-                        "w",
-                        encoding="utf-8",
-                    ) as fp:
-                        json.dump(
-                            {
-                                "solver_name": solver_name,
-                                "function_name": function_name,
-                                "seed": int(seed),
-                                **iteration_json_payload,
-                            },
-                            fp,
-                            indent=2,
-                        )
-                    iteration_results_written = True
+                    iteration_results_payload = {
+                        "solver_name": solver_name,
+                        "function_name": function_name,
+                        "seed": int(seed),
+                        **iteration_json_payload,
+                    }
+                    iteration_results_written = _write_with_retries(
+                        iteration_results_path,
+                        lambda tmp_path: _write_json(
+                            tmp_path,
+                            iteration_results_payload,
+                        ),
+                        "iteration metrics",
+                    )
                 except Exception as exc:
                     print(f"Warning: could not save iteration metrics: {exc}")
 
-            history_path.parent.mkdir(parents=True, exist_ok=True)
-            np.savez_compressed(_path_for_io(history_path), **history_payload)
-            history_written = True
+            history_written = _write_with_retries(
+                history_path,
+                lambda tmp_path: np.savez_compressed(
+                    _path_for_io(tmp_path),
+                    **history_payload,
+                ),
+                "history snapshot",
+            )
         except Exception as exc:
             print(f"Warning: could not save full history snapshot: {exc}")
 
@@ -168,22 +214,21 @@ def _save_solver_progress(
     if best_performance.size > 0 and np.isfinite(best_performance).any():
         best_value = float(np.nanmax(best_performance))
 
-    status_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(_path_for_io(status_path), "w", encoding="utf-8") as fp:
-        json.dump(
-            {
-                "status": status,
-                "completed_iterations": int(completed_iterations),
-                "best_value": best_value,
-                "history_file": history_path.name if history_written else None,
-                "iteration_results_enabled": iteration_results_requested,
-                "iteration_results_file": (
-                    iteration_results_path.name if iteration_results_written else None
-                ),
-            },
-            fp,
-            indent=2,
-        )
+    status_payload = {
+        "status": status,
+        "completed_iterations": int(completed_iterations),
+        "best_value": best_value,
+        "history_file": history_path.name if history_written else None,
+        "iteration_results_enabled": iteration_results_requested,
+        "iteration_results_file": (
+            iteration_results_path.name if iteration_results_written else None
+        ),
+    }
+    _write_with_retries(
+        status_path,
+        lambda tmp_path: _write_json(tmp_path, status_payload),
+        "status checkpoint",
+    )
 
 
 def _main(

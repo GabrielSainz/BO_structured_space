@@ -25,6 +25,7 @@ SOLVER_NAMES = [
     "pr",
     "saas_bo",
     "lambo2",
+    "lsbo",
     "cowboys",
     "cowboys_diffusion",
     "cowboys_flow",
@@ -57,6 +58,7 @@ SOLVER_NAME_TO_ENV = {
     "coordinate_line_bo": "hdbo_benchmark",
     "baxus": "hdbo_baxus",
     "turbo": "hdbo_benchmark",
+    "lsbo": "hdbo_benchmark",
     "cowboys": "hdbo_benchmark",
     "cowboys_diffusion": "hdbo_benchmark",
     "cowboys_flow": "hdbo_benchmark",
@@ -252,6 +254,19 @@ def load_solver_class(
             torch.set_default_dtype(torch.float64)
 
             return Turbo, solver_kwargs
+        case "lsbo":
+            from hdbo_benchmark.solvers.latent_space_bo import (
+                LatentSpaceBayesianOptimization,
+            )
+
+            torch.set_default_dtype(torch.float64)
+
+            solver_kwargs.update(
+                {
+                    "device": DEVICE,
+                }
+            )
+            return LatentSpaceBayesianOptimization, solver_kwargs
         case "cowboys":
             from cowboys import COWBOYS
 

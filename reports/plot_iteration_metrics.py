@@ -9,6 +9,12 @@ python reports/plot_iteration_metrics.py --problems all --folders gs10_clip20_dg
 python reports/plot_iteration_metrics.py --problems all --folders gs10_clip20_dgbo_iteration2 new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration2 new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration2 --methods dgbo nflow3 cowboys --seeds 1 2 3 4 5 --stride 10
 """
 
+# iterations
+# nflow: new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration2
+# lsbo: new_vae_10_chain_100_steps_with_stoch_sampling_lsbo_iteration
+# dgbo: gs10_clip20_dgbo_iteration2
+# cowboys: new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration2
+
 from __future__ import annotations
 
 import argparse
@@ -39,25 +45,27 @@ DEFAULT_FIGURE_FORMATS = ("png", "pdf")
 METHOD_LABELS = {
     "cowboys": "COWBOYS",
     "cowboys_flow": "NFlow",
-    "cowboys_flow_2": "NFlow 3",
+    "cowboys_flow_2": "NFlow",
     "cowboys_diffusion": "DGBO",
+    "lsbo": "LSBO",
 }
 
 METHOD_ALIASES = {
     "cowboys_flow": {"nflow"},
     "cowboys_flow_2": {"nflow3"},
     "cowboys_diffusion": {"dgbo"},
+    "lsbo": {"latentbo", "latent_space_bo"},
 }
 
 COLOR_CYCLE = (
-    "#FF8811",
-    "#392F5A",
-    "#5DA271",
-    "#F25C54",
-    "#2A9D8F",
-    "#6D597A",
-    "#3A5A40",
-    "#577590",
+    "#0072B2",
+    "#D55E00",
+    "#009E73",
+    "#CC79A7",
+    "#56B4E9",
+    "#E69F00",
+    "#332288",
+    "#882255",
 )
 
 TOP_K_MEAN_METRIC_KEY = "mean_available_unique_top_10_candidate_objective"
@@ -527,14 +535,14 @@ def configure_metric_axis(
         axis.yaxis.set_major_formatter(StrMethodFormatter(metric.yformatter))
 
     axis.xaxis.set_major_locator(MaxNLocator(integer=True, nbins=8))
-    axis.grid(axis="y", linewidth=0.9)
-    axis.grid(axis="x", linewidth=0.5, alpha=0.4)
+    axis.grid(axis="y", linewidth=0.55, alpha=0.72)
+    axis.grid(axis="x", linewidth=0.35, alpha=0.28)
     axis.set_axisbelow(True)
 
     axis.spines["top"].set_visible(False)
     axis.spines["right"].set_visible(False)
-    axis.spines["left"].set_color("#9A9A92")
-    axis.spines["bottom"].set_color("#9A9A92")
+    axis.spines["left"].set_color("#707070")
+    axis.spines["bottom"].set_color("#707070")
 
 
 def plot_metric_series(
@@ -558,7 +566,7 @@ def plot_metric_series(
             series.iterations,
             series.mean,
             color=color,
-            linewidth=2.4,
+            linewidth=2.2,
             label=method.label,
             solid_capstyle="round",
         )
@@ -567,7 +575,7 @@ def plot_metric_series(
             series.mean - series.std,
             series.mean + series.std,
             color=color,
-            alpha=0.16,
+            alpha=0.13,
             linewidth=0,
         )
 
@@ -580,7 +588,7 @@ def plot_metric_series(
             ha="center",
             va="center",
             color="#6C6C66",
-            fontsize=11,
+            fontsize=15,
         )
 
     configure_metric_axis(
@@ -594,20 +602,29 @@ def plot_metric_series(
 def configure_matplotlib() -> None:
     plt.rcParams.update(
         {
-            "figure.facecolor": "#FCFCF9",
-            "axes.facecolor": "#FCFCF9",
-            "savefig.facecolor": "#FCFCF9",
-            "axes.edgecolor": "#8F8F88",
-            "axes.labelcolor": "#1F1F1C",
-            "axes.titlecolor": "#1F1F1C",
-            "xtick.color": "#3F3F39",
-            "ytick.color": "#3F3F39",
-            "grid.color": "#DDDDD6",
+            "figure.facecolor": "white",
+            "axes.facecolor": "white",
+            "savefig.facecolor": "white",
+            "axes.edgecolor": "#707070",
+            "axes.labelcolor": "#1A1A1A",
+            "axes.titlecolor": "#1A1A1A",
+            "xtick.color": "#2E2E2E",
+            "ytick.color": "#2E2E2E",
+            "grid.color": "#CFCFCF",
             "font.family": "DejaVu Serif",
-            "font.size": 11,
-            "axes.titlesize": 15,
-            "axes.labelsize": 12,
-            "legend.fontsize": 11,
+            "font.size": 16,
+            "axes.titlesize": 19,
+            "axes.labelsize": 18,
+            "xtick.labelsize": 15,
+            "ytick.labelsize": 15,
+            "legend.fontsize": 15,
+            "axes.linewidth": 0.8,
+            "xtick.major.size": 3.5,
+            "ytick.major.size": 3.5,
+            "xtick.major.width": 0.8,
+            "ytick.major.width": 0.8,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
         }
     )
 
@@ -640,7 +657,7 @@ def save_metric_plot(
         transform=axis.transAxes,
         ha="left",
         va="bottom",
-        fontsize=10,
+        fontsize=15,
         color="#66665F",
     )
 
@@ -649,26 +666,11 @@ def save_metric_plot(
         legend = axis.legend(
             loc="upper left",
             frameon=False,
-            ncols=min(3, len(methods)),
+            ncols=min(4, len(methods)),
             handlelength=2.6,
         )
         for line in legend.get_lines():
             line.set_linewidth(2.6)
-
-    axis.text(
-        1.0,
-        -0.16,
-        (
-            f"Seeds: {', '.join(map(str, seeds))}"
-            f"   |   Every {stride} iteration(s)"
-            f"   |   Full-seed iterations only"
-        ),
-        transform=axis.transAxes,
-        ha="right",
-        va="top",
-        fontsize=9,
-        color="#6C6C66",
-    )
 
     figure.tight_layout()
 
@@ -680,23 +682,6 @@ def save_metric_plot(
 
     plt.close(figure)
     return output_paths
-
-
-def build_summary_footer(
-    prepared_problem_data: list[PreparedProblemData],
-    stride: int,
-) -> str:
-    unique_seed_sets = {tuple(problem_data.seeds) for problem_data in prepared_problem_data}
-    if len(unique_seed_sets) == 1:
-        seed_text = f"Seeds: {', '.join(map(str, prepared_problem_data[0].seeds))}"
-    else:
-        seed_text = "Seeds: per-problem common seeds across methods"
-
-    return (
-        f"{seed_text}"
-        f"   |   Every {stride} iteration(s)"
-        f"   |   Full-seed iterations only"
-    )
 
 
 def save_metric_summary_grid(
@@ -733,7 +718,7 @@ def save_metric_summary_grid(
             f"({panel_letter}) {prettify_name(problem_data.problem)}",
             loc="left",
             pad=10,
-            fontsize=14,
+            fontsize=18,
         )
 
     for idx in range(n_problems, n_rows * n_cols):
@@ -747,22 +732,12 @@ def save_metric_summary_grid(
             loc="lower center",
             ncol=min(4, len(methods)),
             frameon=False,
-            bbox_to_anchor=(0.5, 0.035),
+            bbox_to_anchor=(0.5, 0.02),
             handlelength=2.4,
             columnspacing=1.2,
         )
 
-    figure.suptitle(metric.title, x=0.07, y=0.985, ha="left", fontsize=18)
-    figure.text(
-        0.5,
-        0.085,
-        build_summary_footer(prepared_problem_data, stride),
-        ha="center",
-        va="center",
-        fontsize=10,
-        color="#6C6C66",
-    )
-    figure.tight_layout(rect=(0.03, 0.12, 0.995, 0.95))
+    figure.tight_layout(rect=(0.03, 0.075, 0.995, 0.99))
 
     summary_dir = output_dir / "_summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
@@ -817,13 +792,13 @@ def configure_scatter_axis(
     axis.set_ylabel(SCATTER_YLABEL if show_ylabel else "")
     axis.xaxis.set_major_formatter(StrMethodFormatter("{x:.3f}"))
     axis.yaxis.set_major_formatter(StrMethodFormatter("{x:.3f}"))
-    axis.grid(axis="both", linewidth=0.8, alpha=0.75)
+    axis.grid(axis="both", linewidth=0.5, alpha=0.7)
     axis.set_axisbelow(True)
 
     axis.spines["top"].set_visible(False)
     axis.spines["right"].set_visible(False)
-    axis.spines["left"].set_color("#9A9A92")
-    axis.spines["bottom"].set_color("#9A9A92")
+    axis.spines["left"].set_color("#707070")
+    axis.spines["bottom"].set_color("#707070")
 
 
 def plot_tradeoff_scatter(
@@ -845,7 +820,7 @@ def plot_tradeoff_scatter(
             ha="center",
             va="center",
             color="#6C6C66",
-            fontsize=11,
+            fontsize=15,
         )
     else:
         for index, method in enumerate(methods):
@@ -862,7 +837,7 @@ def plot_tradeoff_scatter(
             axis.scatter(
                 x_value,
                 y_value,
-                s=92,
+                s=82,
                 color=color,
                 edgecolors="#1F1F1C",
                 linewidths=0.65,
@@ -903,7 +878,7 @@ def save_tradeoff_scatter_plot(
         transform=axis.transAxes,
         ha="left",
         va="bottom",
-        fontsize=10,
+        fontsize=15,
         color="#66665F",
     )
 
@@ -912,25 +887,10 @@ def save_tradeoff_scatter_plot(
         axis.legend(
             loc="best",
             frameon=False,
-            ncols=min(3, len(methods)),
+            ncols=min(4, len(methods)),
             handletextpad=0.45,
             columnspacing=1.0,
         )
-
-    axis.text(
-        1.0,
-        -0.16,
-        (
-            f"Seeds: {', '.join(map(str, seeds))}"
-            f"   |   Every {stride} iteration(s)"
-            f"   |   Mean over plotted iterations"
-        ),
-        transform=axis.transAxes,
-        ha="right",
-        va="top",
-        fontsize=9,
-        color="#6C6C66",
-    )
 
     figure.tight_layout()
 
@@ -976,7 +936,7 @@ def save_tradeoff_summary_grid(
             f"({panel_letter}) {prettify_name(problem_data.problem)}",
             loc="left",
             pad=10,
-            fontsize=14,
+            fontsize=18,
         )
 
     for idx in range(n_problems, n_rows * n_cols):
@@ -990,24 +950,12 @@ def save_tradeoff_summary_grid(
             loc="lower center",
             ncol=min(4, len(methods)),
             frameon=False,
-            bbox_to_anchor=(0.5, 0.035),
+            bbox_to_anchor=(0.5, 0.02),
             handletextpad=0.45,
             columnspacing=1.2,
         )
 
-    figure.suptitle(SCATTER_TITLE, x=0.07, y=0.985, ha="left", fontsize=18)
-    figure.text(
-        0.5,
-        0.085,
-        build_summary_footer(prepared_problem_data, stride).replace(
-            "Full-seed iterations only", "Mean over plotted iterations"
-        ),
-        ha="center",
-        va="center",
-        fontsize=10,
-        color="#6C6C66",
-    )
-    figure.tight_layout(rect=(0.03, 0.12, 0.995, 0.95))
+    figure.tight_layout(rect=(0.03, 0.075, 0.995, 0.99))
 
     summary_dir = output_dir / "_summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
@@ -1058,7 +1006,7 @@ def save_problem_metric_matrix_grid(
                     MATRIX_METRIC_TITLES.get(metric.key, metric.title),
                     loc="left",
                     pad=8,
-                    fontsize=13,
+                    fontsize=17,
                 )
             else:
                 axis.set_title("")
@@ -1071,7 +1019,7 @@ def save_problem_metric_matrix_grid(
                     transform=axis.transAxes,
                     ha="right",
                     va="center",
-                    fontsize=11,
+                    fontsize=15,
                     color="#1F1F1C",
                 )
 
@@ -1083,22 +1031,12 @@ def save_problem_metric_matrix_grid(
             loc="lower center",
             ncol=min(4, len(methods)),
             frameon=False,
-            bbox_to_anchor=(0.5, 0.035),
+            bbox_to_anchor=(0.5, 0.02),
             handlelength=2.4,
             columnspacing=1.2,
         )
 
-    figure.suptitle("Iteration Metrics by Problem", x=0.07, y=0.985, ha="left", fontsize=18)
-    figure.text(
-        0.5,
-        0.085,
-        build_summary_footer(prepared_problem_data, stride),
-        ha="center",
-        va="center",
-        fontsize=10,
-        color="#6C6C66",
-    )
-    figure.tight_layout(rect=(0.11, 0.12, 0.995, 0.95))
+    figure.tight_layout(rect=(0.11, 0.075, 0.995, 0.99))
 
     summary_dir = output_dir / "_summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
@@ -1189,7 +1127,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--methods",
         nargs="+",
-        help="Optional subset of methods to compare. Accepts aliases like 'cowboys', 'nflow', 'nflow3', and 'dgbo'.",
+        help="Optional subset of methods to compare. Accepts aliases like 'cowboys', 'nflow', 'nflow3', 'dgbo', and 'lsbo'.",
     )
     parser.add_argument(
         "--folders",

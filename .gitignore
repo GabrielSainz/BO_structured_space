@@ -57,6 +57,7 @@ error*.log
 output*.log
 reports/figures/
 reports/iteration_plots/
+logs/lsbo_poli/
 
 # Baxus output
 conf_dict.json

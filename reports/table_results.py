@@ -70,8 +70,21 @@ def compute_npy_group_stats(folder):
 
     return results
 
+# table
+# nflow: new_vae_10_chain_100_steps_with_stoch_sampling_3
+# cowboys: new_vae_10_chain_100_steps_with_stoch_sampling_cowboys
+# lsbo: new_vae_10_chain_100_steps_with_stoch_sampling_lsbo_iteration
 
-folder = "results/new_vae_10_chain_100_steps_with_stoch_sampling_3"
+# iterations
+# nflow: new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration2
+# lsbo: new_vae_10_chain_100_steps_with_stoch_sampling_lsbo_iteration
+# dgbo: gs10_clip20_dgbo_iteration2
+# cowboys: new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration2
+
+
+model = "new_vae_10_chain_100_steps_with_stoch_sampling_lsbo_iteration"
+
+folder = f"results/{model}"
 stats = compute_npy_group_stats(folder)
 
 for name, res in stats.items():
