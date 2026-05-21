@@ -76,8 +76,8 @@ SCATTER_X_METRIC_KEY = "mean_selected_nearest_previous_tanimoto_distance"
 SCATTER_Y_METRIC_KEY = ADJUSTED_TOP_K_METRIC_KEY
 SCATTER_TITLE = "Exploration vs Adjusted Candidate Quality"
 SCATTER_FILENAME = "plot_4_distance_vs_adjusted_top_k_candidate_objective"
-SCATTER_XLABEL = "Avg. nearest-prev. distance"
-SCATTER_YLABEL = "Avg. adjusted top-k objective"
+SCATTER_XLABEL = "Avg. nearest-prev. dist."
+SCATTER_YLABEL = "Avg. adj. top-k obj."
 
 MATRIX_GRID_FILENAME = "summary_6_problems_3_metrics_grid"
 MATRIX_METRIC_TITLES = {
@@ -588,7 +588,7 @@ def plot_metric_series(
             ha="center",
             va="center",
             color="#6C6C66",
-            fontsize=15,
+            fontsize=17,
         )
 
     configure_metric_axis(
@@ -612,12 +612,12 @@ def configure_matplotlib() -> None:
             "ytick.color": "#2E2E2E",
             "grid.color": "#CFCFCF",
             "font.family": "DejaVu Serif",
-            "font.size": 16,
-            "axes.titlesize": 19,
-            "axes.labelsize": 18,
-            "xtick.labelsize": 15,
-            "ytick.labelsize": 15,
-            "legend.fontsize": 15,
+            "font.size": 18,
+            "axes.titlesize": 22,
+            "axes.labelsize": 20,
+            "xtick.labelsize": 17,
+            "ytick.labelsize": 17,
+            "legend.fontsize": 17,
             "axes.linewidth": 0.8,
             "xtick.major.size": 3.5,
             "ytick.major.size": 3.5,
@@ -657,7 +657,7 @@ def save_metric_plot(
         transform=axis.transAxes,
         ha="left",
         va="bottom",
-        fontsize=15,
+        fontsize=17,
         color="#66665F",
     )
 
@@ -718,7 +718,7 @@ def save_metric_summary_grid(
             f"({panel_letter}) {prettify_name(problem_data.problem)}",
             loc="left",
             pad=10,
-            fontsize=18,
+            fontsize=20,
         )
 
     for idx in range(n_problems, n_rows * n_cols):
@@ -737,7 +737,7 @@ def save_metric_summary_grid(
             columnspacing=1.2,
         )
 
-    figure.tight_layout(rect=(0.03, 0.075, 0.995, 0.99))
+    figure.tight_layout(rect=(0.045, 0.085, 0.995, 0.99))
 
     summary_dir = output_dir / "_summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
@@ -820,7 +820,7 @@ def plot_tradeoff_scatter(
             ha="center",
             va="center",
             color="#6C6C66",
-            fontsize=15,
+            fontsize=17,
         )
     else:
         for index, method in enumerate(methods):
@@ -878,7 +878,7 @@ def save_tradeoff_scatter_plot(
         transform=axis.transAxes,
         ha="left",
         va="bottom",
-        fontsize=15,
+        fontsize=17,
         color="#66665F",
     )
 
@@ -936,7 +936,7 @@ def save_tradeoff_summary_grid(
             f"({panel_letter}) {prettify_name(problem_data.problem)}",
             loc="left",
             pad=10,
-            fontsize=18,
+            fontsize=20,
         )
 
     for idx in range(n_problems, n_rows * n_cols):
@@ -955,7 +955,7 @@ def save_tradeoff_summary_grid(
             columnspacing=1.2,
         )
 
-    figure.tight_layout(rect=(0.03, 0.075, 0.995, 0.99))
+    figure.tight_layout(rect=(0.055, 0.085, 0.995, 0.99))
 
     summary_dir = output_dir / "_summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
@@ -1006,7 +1006,7 @@ def save_problem_metric_matrix_grid(
                     MATRIX_METRIC_TITLES.get(metric.key, metric.title),
                     loc="left",
                     pad=8,
-                    fontsize=17,
+                    fontsize=19,
                 )
             else:
                 axis.set_title("")
@@ -1019,7 +1019,7 @@ def save_problem_metric_matrix_grid(
                     transform=axis.transAxes,
                     ha="right",
                     va="center",
-                    fontsize=15,
+                    fontsize=17,
                     color="#1F1F1C",
                 )
 
@@ -1036,7 +1036,7 @@ def save_problem_metric_matrix_grid(
             columnspacing=1.2,
         )
 
-    figure.tight_layout(rect=(0.11, 0.075, 0.995, 0.99))
+    figure.tight_layout(rect=(0.13, 0.085, 0.995, 0.99))
 
     summary_dir = output_dir / "_summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
