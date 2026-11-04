@@ -2,11 +2,11 @@
 for i in {1..5}
 do
     #python run.py --function-name albuterol_similarity --solver-name cowboys_flow_2 --max-iter 300 --seed $i --no-strict-on-hash --sufix "3"
-    #
+
     #python run.py --function-name amlodipine_mpo --solver-name cowboys_flow_2 --max-iter 300 --seed $i --no-strict-on-hash  --sufix "3"
-    #    
+
     #python run.py --function-name celecoxib_rediscovery --solver-name cowboys_flow_2 --max-iter 300 --seed $i --no-strict-on-hash --sufix "3"
-    #    
+    
     #python run.py --function-name deco_hop --solver-name cowboys_flow_2 --max-iter 300 --seed $i --no-strict-on-hash --sufix "3"
         
     python run.py --function-name drd2_docking --solver-name cowboys_flow_2 --max-iter 300 --seed $i --no-strict-on-hash --sufix "3"

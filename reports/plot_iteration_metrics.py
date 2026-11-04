@@ -693,7 +693,7 @@ def save_metric_summary_grid(
     stride: int,
 ) -> list[Path]:
     n_problems = len(prepared_problem_data)
-    n_cols = 1 if n_problems == 1 else 2
+    n_cols = min(3, n_problems)
     n_rows = math.ceil(n_problems / n_cols)
     figure, axes = plt.subplots(
         n_rows,
@@ -912,7 +912,7 @@ def save_tradeoff_summary_grid(
     stride: int,
 ) -> list[Path]:
     n_problems = len(prepared_problem_data)
-    n_cols = 1 if n_problems == 1 else 2
+    n_cols = min(3, n_problems)
     n_rows = math.ceil(n_problems / n_cols)
     figure, axes = plt.subplots(
         n_rows,
