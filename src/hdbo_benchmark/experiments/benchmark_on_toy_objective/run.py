@@ -14,7 +14,7 @@ from poli.objective_repository import ToyContinuousBlackBox  # type: ignore
 
 import hdbo_benchmark
 from hdbo_benchmark.utils.constants import ROOT_DIR
-from hdbo_benchmark.utils.experiments.load_solvers import (
+from hdbo_benchmark.solvers.registry import (
     SOLVER_NAMES,
     load_solver_class,
 )

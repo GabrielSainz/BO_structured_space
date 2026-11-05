@@ -1,15 +1,34 @@
-# Applying COWBOYS to the benchmark of High-Dimensional Bayesian Optimization for discrete sequence optimization
+# COWBOYS and structured Bayesian optimization
 
-[![Link to Project website](https://img.shields.io/badge/GitHub-Project_Website-100000?logo=github&logoColor=white)](https://machinelearninglifescience.github.io/hdbo_benchmark)
-[![Link to Project website](https://img.shields.io/badge/GitHub-poli_docs-100000?logo=github&logoColor=white)](https://machinelearninglifescience.github.io/poli-docs)
-[![Tests on hdbo (conda, python 3.10)](https://github.com/MachineLearningLifeScience/hdbo_benchmark/actions/workflows/tox-lint-and-pytest.yml/badge.svg)](https://github.com/MachineLearningLifeScience/hdbo_benchmark/actions/workflows/tox-lint-and-pytest.yml)
+Research code for Bayesian optimization over discrete and structured sequences
+using **poli** and **poli-baselines**, including molecular and protein objectives,
+latent representations, Gaussian processes and generative candidate proposals.
+The existing Python package is `hdbo_benchmark`.
 
-This repository contains the code to apply COWBOYS to a benchmark of **high-dimensional Bayesian optimization** over discrete sequences using [poli](https://github.com/MachineLearningLifeScience/poli) and [poli-baselines](https://github.com/MachineLearningLifeScience/poli-baselines).
+Phase 1 reorganizes existing implementations and entry points. It does not
+change algorithms, defaults, evaluation budgets or benchmark definitions.
+Scientific diagnostics and new research methods are future work.
 
+## Existing methods
 
-### Recommended setup
+| Local method / CLI key | Implementation |
+|---|---|
+| COWBOYS ? `cowboys` | `src/hdbo_benchmark/solvers/cowboys.py` |
+| Flow COWBOYS ? `cowboys_flow` | `src/hdbo_benchmark/solvers/cowboys_flow.py` |
+| Second flow variant ? `cowboys_flow_2` | `src/hdbo_benchmark/solvers/cowboys_flow_2.py` |
+| Diffusion COWBOYS ? `cowboys_diffusion` | `src/hdbo_benchmark/solvers/cowboys_diffusion.py` |
+| LSBO ? `lsbo` | `src/hdbo_benchmark/solvers/latent_space_bo.py` |
 
-The most reliable setup is a fresh Conda environment with Python 3.10.
+The [registry](src/hdbo_benchmark/solvers/registry.py) also integrates upstream
+directed evolution, hill climbing, genetic algorithm, CMA-ES, random/coordinate
+LineBO, BAxUS, TuRBO, Hvarfner BO, ALEBO, Bounce, PR, SAASBO and LaMBO2. Optional
+methods require their original environments. Factory-only vanilla BO variants
+and older Ax/latent wrappers are retained; see the [audit](docs/REPOSITORY_AUDIT.md).
+
+## Installation
+
+Use the established Python 3.10 environment. From the repository root, the
+existing setup procedure is:
 
 ```bash
 conda create -n hdbo_benchmark python=3.10
@@ -20,102 +39,130 @@ python -m pip install gauche selfies
 python -m pip install -e .
 ```
 
-For the PMO tasks used by `run.py`, install the extra chemistry/runtime dependencies in the same environment:
+For molecular PMO objectives, the existing chemistry setup is:
 
 ```bash
 conda install -c conda-forge "rdkit<2024.03" -y
 python -m pip install --upgrade PyTDC "huggingface_hub<1"
-```
-
-These two quick checks should work before you launch the benchmark:
-
-```bash
 python -c "import rdkit; print(rdkit.__version__)"
 python -c "from tdc import Oracle; print('tdc ok')"
 ```
 
-If you want Weights & Biases logging, set `WANDB_PROJECT` and `WANDB_ENTITY` in `src/hdbo_benchmark/utils/constants.py`. For a simple local run, use `--wandb-mode disabled`.
+These are retained setup instructions, not a newly validated dependency lock.
+The build system declares `setuptools<=68`; a local no-isolation build with
+setuptools 80.10.2 failed with the original and migrated metadata. The available
+Windows research environment also fails during COWBOYS GP fitting. See
+[verification and limits](docs/MIGRATION_VERIFICATION.md) before interpreting
+these commands as a verified clean installation or successful experiment.
+Colab remains experimental because of chemistry/TDC and model-stack dependencies.
 
-### Run one PMO benchmark
+Existing Conda definitions, extras and runtime settings are indexed in
+[configs/README.md](configs/README.md). Keep preprocessing separate from research
+execution; its environment targets Python 3.8/TorchDrug. No environments or
+scientific dependencies were installed or upgraded during this restructuring.
 
-This reproduces a single COWBOYS run on the `albuterol_similarity` task using the pretrained 128-dimensional molecular VAE:
+## Run existing entry points
 
-```bash
-python run.py \
-  --function-name albuterol_similarity \
-  --solver-name cowboys \
-  --n-dimensions 128 \
-  --max-iter 300 \
-  --seed 1 \
-  --no-strict-on-hash \
-  --wandb-mode disabled \
-  --tag local-test
-```
-
-Important notes:
-
-- this does not train a VAE; it loads the pretrained checkpoint shipped with the repository
-- the first PMO run can take a bit longer because `poli` prepares the underlying task machinery
-- the final output is written to `results/new_vae_10_chain_100_steps_with_stoch_sampling/<function_name>_<seed>.npy`
-
-### Run the full PMO sweep
-
-To run COWBOYS across all molecular PMO tasks and seeds:
+Run from the repository root after installation:
 
 ```bash
-./run.sh
+python run.py --help
+python -m hdbo_benchmark.experiments.run --help
 ```
 
-On Windows, use Git Bash, WSL, or translate the loop in `run.sh` into PowerShell commands.
+Both invoke the same existing CLI. An example of the bounded CPU check used in
+Phase 1 (Bash) is:
 
-### What gets saved
-
-The main entry point `run.py` saves one local `.npy` file per run containing the best objective value found by the solver.
-
-If you run with WANDB enabled, the observer also logs:
-
-- `x`: the evaluated sequence or latent point
-- `y`: the objective value of that evaluation
-- `best_y`: the best score seen so far
-
-The repository also contains separate post-processing scripts under `src/hdbo_benchmark/results/` for creating tables and figures after many runs have finished.
-
-### Google Colab (experimental)
-
-Colab can work, but it is less reliable than a local Conda environment because the PMO stack depends on chemistry packages and TDC/poli integrations.
-
-The PMO tasks in this repo need `tdc` available in the active Python
-environment. On pip, that package is distributed as `PyTDC`. If `tdc` is
-missing, `poli` falls back to a Conda-based isolation path, which is exactly
-the failure mode you see on Colab.
-
-Colab is also sensitive to `huggingface_hub` versions. A recent `1.x` upgrade
-can clash with the older `transformers` stack that gets pulled in indirectly by
-`lightning`, so keep it below `1.0` there.
-
-Suggested Colab workflow:
-
-```python
-!git clone <your repo url>
-%cd ROTLSC
-!python -m pip install --upgrade pip
-!python -m pip install "numpy<2" click
-!python -m pip install -r requirements.txt
-!python -m pip install gauche selfies PyTDC "huggingface_hub<1" "rdkit<2024.03"
-!python -m pip install -e . --no-deps
+```bash
+HDBO_TORCH_DEVICE=cpu OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python run.py --function-name albuterol_similarity --solver-name cowboys --n-dimensions 128 --max-iter 1 --seed 1 --no-strict-on-hash --wandb-mode disabled --tag phase1-structure --sufix your_unique_check_name
 ```
 
-Then run:
+In PowerShell, set `$env:HDBO_TORCH_DEVICE = 'cpu'`,
+`$env:OMP_NUM_THREADS = '1'`, and `$env:MKL_NUM_THREADS = '1'`, then invoke the
+same `python run.py ...` command. The existing PMO loader uses ten initial
+molecules; `--max-iter 1` requests one additional optimization iteration. The
+attempt failed before completing that iteration in the recorded environment;
+partial output creation and identical initial histories were checked.
+Use a fresh `--sufix` to avoid reusing existing output filenames.
 
-```python
-!python run.py --function-name albuterol_similarity --solver-name cowboys --n-dimensions 128 --max-iter 300 --seed 1 --no-strict-on-hash --wandb-mode disabled --tag colab-test
+The previous long-run command remains valid in a working scientific environment:
+
+```bash
+python run.py --function-name albuterol_similarity --solver-name cowboys --n-dimensions 128 --max-iter 300 --seed 1 --no-strict-on-hash --wandb-mode disabled --tag local-test --sufix unique_run_name
 ```
 
-Before launching the benchmark, these checks should pass:
+It loads an existing molecular VAE checkpoint; it is not a lightweight check.
+Full sweeps remain available through `bash run.sh` and the unchanged script body
+at `scripts/experiments/run.sh`. Flow, diffusion and LSBO launchers are described
+in [scripts/README.md](scripts/README.md). Use Git Bash/WSL on Windows for shell
+scripts. Inspect budgets before launching sweeps. Root SLURM batch files and
+historical package experiment entry points remain in their original locations.
 
-```python
-!python -c "import rdkit; print(rdkit.__version__)"
-!python -c "from tdc import Oracle; print('tdc ok')"
+## Structure and outputs
+
+```text
+src/hdbo_benchmark/
+  solvers/            local methods and external solver registry
+  benchmarks/         poli loading and representation adapters
+  generative_models/  existing VAEs, protein AE, one-hot and diffusion
+  experiments/        current CLI and historical/training protocols
+  evaluation/         current local plotting and tables
+  results/            historical analysis source (not generated results)
+  utils/              existing shared/domain helpers
+  assets/             existing package resources
+  data_preprocessing/ existing dataset preparation
+scripts/experiments/  existing shell experiment configurations
+configs/              configuration index (no new config framework)
+tests/                lightweight structure and existing integration checks
+docs/                 architecture, audit, verification and future work
+data/                 datasets and pretrained checkpoints
+results/              generated optimization results
+reports/              figures and legacy report entry points
 ```
 
-If Colab dependency resolution fails, prefer a Linux or Windows Conda environment instead. For reproducibility, the local Conda route is the recommended one.
+Root Python/shell entry points and old loader imports remain as compatibility
+shims. Edit the canonical implementations under `src/hdbo_benchmark/`.
+
+The current runner saves best-performance `.npy`, available history `.npz`,
+status JSON and requested iteration-metric JSON. Non-diffusion output goes to
+`results/new_vae_10_chain_100_steps_with_stoch_sampling_<sufix>/`; diffusion
+outputs use the existing parameter-derived subdirectories under
+`results/diffusion/`. Filenames include solver, function and seed. Older runners
+retain their own data/W&B output formats. Existing data and historical results
+were not moved or deleted.
+
+For local analysis:
+
+```bash
+python -m hdbo_benchmark.evaluation.plot_iteration_metrics --help
+python reports/plot_iteration_metrics.py --help
+python -m hdbo_benchmark.evaluation.table_results
+```
+
+The table module retains its existing hardcoded result selection and top-level
+printing. W&B settings remain in `utils/constants.py`; use the existing
+`--wandb-mode disabled` for local verification.
+
+## Checks and documentation
+
+Dependency-free structural checks:
+
+```bash
+python -m unittest tests.test_structure -v
+```
+
+Existing integration tests now live under `tests/test_main_entry_point.py`.
+With pytest and the relevant scientific dependencies installed, select them
+explicitly, for example `python -m pytest tests/test_main_entry_point.py -m hdbo_base`.
+This runs real benchmark combinations and is not a cheap smoke test. The root
+test path is retained; default pytest discovery avoids collecting it twice.
+The existing tox environments remain available and can install dependencies/run
+benchmarks. They were not launched during Phase 1.
+
+- [Architecture and compatibility](docs/architecture.md)
+- [Repository audit](docs/REPOSITORY_AUDIT.md) and [complete original file inventory](docs/FILE_INVENTORY.md)
+- [Migration map and verification](docs/MIGRATION_VERIFICATION.md)
+- [Known technical debt](docs/TECHNICAL_DEBT.md), including user-reported zero-valued objectives
+- [Future milestones](docs/ROADMAP.md): benchmark diagnostics, unified experiments,
+  algorithm verification, benchmarking/analysis, and new research methods
+- [Codex guidance](AGENTS.md)

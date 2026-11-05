@@ -75,7 +75,7 @@ data/bounce_results/
 data/results_cache/
 
 # Results
-results/
+/results/
 
 # Running experiments locally
 *.local.sh

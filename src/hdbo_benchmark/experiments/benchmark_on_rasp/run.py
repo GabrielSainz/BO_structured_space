@@ -23,7 +23,7 @@ from poli.repository import RaspProblemFactory
 import hdbo_benchmark
 from hdbo_benchmark.generative_models.ae_for_esm import LitAutoEncoder
 from hdbo_benchmark.utils.constants import DEVICE, ROOT_DIR
-from hdbo_benchmark.utils.experiments.load_solvers import (
+from hdbo_benchmark.solvers.registry import (
     SOLVER_NAMES,
     load_solver_class,
 )
