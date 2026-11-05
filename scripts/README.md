@@ -1,9 +1,9 @@
 # Existing experiment launch scripts
 
 Run these from the **repository root** after activating the appropriate existing
-environment. Root `run*.sh` entry points forward to the corresponding scripts
-here, forwarding arguments and exit status without changing the working
-directory. Their experiment commands, settings and loops are preserved.
+environment. Invoke the scripts here directly; redundant root `run*.sh`
+forwarders have been removed. Experiment commands, settings and loops are
+preserved.
 
 | Scripts under `experiments/` | Existing role |
 |---|---|
@@ -16,6 +16,10 @@ Example: `bash scripts/experiments/run_lsbo_poli.sh`. This is an existing sweep,
 not a lightweight check. Inspect scripts before running them: some run many
 seeds or hundreds of iterations. No sweep was executed during Phase 1.
 
-`batch.sh` and `batch_gpu.sh` remain at the root because SLURM must read their
-`#SBATCH` directives directly. Older benchmark-specific batch and compiler
-scripts remain beside their protocols in `src/hdbo_benchmark/experiments/`.
+SLURM entry points are `scripts/slurm/batch.sh` and
+`scripts/slurm/batch_gpu.sh`. Submit them directly from the repository root with
+`sbatch scripts/slurm/batch.sh ...` (or the GPU variant), passing the same
+function, solver, dimensions, iterations, tag and environment arguments as
+before. Their `#SBATCH` directives and working-directory assumptions are
+unchanged. Older benchmark-specific batch and compiler scripts remain beside
+their protocols in `src/hdbo_benchmark/experiments/`.

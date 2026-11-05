@@ -24,19 +24,19 @@ ROTLSC/
       assets/                 packaged metadata and checkpoints
       sanity_checks/          existing BO demonstration
   scripts/experiments/         existing shell sweeps
+  scripts/slurm/               SLURM entry points
   tests/                      structural and existing integration tests
   docs/                       audit, architecture, migration evidence, future work
   data/                       existing datasets/checkpoints/PDBs/embeddings
   results/                    generated optimization outputs (ignored)
-  reports/                    figures and legacy analysis entry points
+  reports/                    generated figures
   logs/, wandb/, oracle/       existing local runtime artifacts
-  run.py, cowboys*.py          checkout compatibility aliases
-  run*.sh                     checkout compatibility launchers
-  batch.sh, batch_gpu.sh       unchanged SLURM entry points
+  run.py                      main convenience launcher
 ```
 
-The root aliases are deliberate compatibility boundaries, not duplicate algorithm
-implementations. There are no empty method/config/notebook placeholder folders.
+The main root launcher and installed aliases are compatibility boundaries.
+Redundant root method, shell, report and test launchers were removed in the
+[post-migration cleanup](CLEANUP.md). No scientific implementations were removed.
 
 ## Methods and scientific components
 
@@ -143,15 +143,18 @@ repository-relative external data remains a limitation for standalone installs.
 
 ## Compatibility and import boundaries
 
-- Root COWBOYS modules, `run`, and old loader/transform module paths alias the
-  canonical module in `sys.modules`, preserving private helpers and shared module
-  state. New internal references use canonical imports.
-- `src/cowboys*.py` and `src/run.py`, declared in `setup.cfg`, provide the same
-  aliases in installed distributions. Root copies serve checkout entry points.
-- Old report script paths and the explicit root integration-test path remain
-  usable. Pytest defaults to `tests/` to avoid duplicate collection.
-- Root `run*.sh` forwards to unchanged script bodies in `scripts/experiments/`.
-  Working-directory assumptions, environment variables and exit status remain.
+- `src/cowboys*.py` and `src/run.py`, declared in `setup.cfg`, preserve old
+  import names in installed distributions. Root `run.py` remains for scripts and
+  convenience. Redundant root COWBOYS aliases have been removed.
+- Old loader/transform paths still alias their canonical modules in
+  `sys.modules`, preserving private helpers and shared module state. Internal
+  code uses canonical imports.
+- Invoke local analysis with `python -m hdbo_benchmark.evaluation.<module>` and
+  integration tests from `tests/test_main_entry_point.py`. Their old report/root
+  launchers have been removed.
+- Invoke sweep scripts directly under `scripts/experiments/` and submit SLURM
+  files directly under `scripts/slurm/`. Continue using the repository root as
+  the working directory; command settings and scheduler directives are intact.
 - `solvers` lazily resolves its two existing exported classes. Importing package
   namespaces does not load PyTorch/poli/plotting. Importing an actual solver still
   needs its original scientific dependencies; broad generative-model imports

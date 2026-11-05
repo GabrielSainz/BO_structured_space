@@ -37,12 +37,14 @@ assert not {'torch', 'poli', 'botorch', 'matplotlib'} & sys.modules.keys()
                     (ROOT / "src" / "hdbo_benchmark" / "solvers" / f"{name}.py").is_file()
                 )
 
-    def test_shell_compatibility_targets_exist(self):
-        for script in (ROOT / "scripts" / "experiments").glob("run*.sh"):
+    def test_shell_launchers_reference_existing_runner(self):
+        self.assertTrue((ROOT / "run.py").is_file())
+        scripts = list((ROOT / "scripts" / "experiments").glob("run*.sh"))
+        scripts.extend((ROOT / "scripts" / "slurm").glob("batch*.sh"))
+        self.assertTrue(scripts)
+        for script in scripts:
             with self.subTest(script=script.name):
-                wrapper = (ROOT / script.name).read_text(encoding="utf-8")
-                self.assertIn(f"scripts/experiments/{script.name}", wrapper)
-                self.assertIn('"$@"', wrapper)
+                self.assertIn("python run.py", script.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

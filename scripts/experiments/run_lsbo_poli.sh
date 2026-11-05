@@ -1,6 +1,6 @@
 #!/bin/bash
-# chmod +x run_lsbo_poli.sh
-# ./run_lsbo_poli.sh
+# chmod +x scripts/experiments/run_lsbo_poli.sh
+# bash scripts/experiments/run_lsbo_poli.sh
 
 set -u -o pipefail
 

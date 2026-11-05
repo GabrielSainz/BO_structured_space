@@ -92,11 +92,10 @@ python run.py --function-name albuterol_similarity --solver-name cowboys --n-dim
 ```
 
 It loads an existing molecular VAE checkpoint; it is not a lightweight check.
-Full sweeps remain available through `bash run.sh` and the unchanged script body
-at `scripts/experiments/run.sh`. Flow, diffusion and LSBO launchers are described
+Full sweeps run through `bash scripts/experiments/run.sh`. Flow, diffusion and LSBO launchers are described
 in [scripts/README.md](scripts/README.md). Use Git Bash/WSL on Windows for shell
-scripts. Inspect budgets before launching sweeps. Root SLURM batch files and
-historical package experiment entry points remain in their original locations.
+scripts. Inspect budgets before launching sweeps. SLURM batch files are under `scripts/slurm/`; submit them from the repository
+root. Historical package experiment entry points retain their locations.
 
 ## Structure and outputs
 
@@ -112,6 +111,7 @@ src/hdbo_benchmark/
   assets/             existing package resources
   data_preprocessing/ existing dataset preparation
 scripts/experiments/  existing shell experiment configurations
+scripts/slurm/        scheduler entry points
 configs/              configuration index (no new config framework)
 tests/                lightweight structure and existing integration checks
 docs/                 architecture, audit, verification and future work
@@ -120,8 +120,11 @@ results/              generated optimization results
 reports/              figures and legacy report entry points
 ```
 
-Root Python/shell entry points and old loader imports remain as compatibility
-shims. Edit the canonical implementations under `src/hdbo_benchmark/`.
+Root `run.py` remains the main convenience launcher. Redundant root method,
+sweep, report and test launchers have been removed. Installed module aliases in
+`src/` and old loader imports remain for import/serialization compatibility.
+Edit canonical implementations under `src/hdbo_benchmark/`. See the
+[cleanup record](docs/CLEANUP.md) for replacement commands.
 
 The current runner saves best-performance `.npy`, available history `.npz`,
 status JSON and requested iteration-metric JSON. Non-diffusion output goes to
@@ -135,7 +138,6 @@ For local analysis:
 
 ```bash
 python -m hdbo_benchmark.evaluation.plot_iteration_metrics --help
-python reports/plot_iteration_metrics.py --help
 python -m hdbo_benchmark.evaluation.table_results
 ```
 
@@ -154,8 +156,7 @@ python -m unittest tests.test_structure -v
 Existing integration tests now live under `tests/test_main_entry_point.py`.
 With pytest and the relevant scientific dependencies installed, select them
 explicitly, for example `python -m pytest tests/test_main_entry_point.py -m hdbo_base`.
-This runs real benchmark combinations and is not a cheap smoke test. The root
-test path is retained; default pytest discovery avoids collecting it twice.
+This runs real benchmark combinations and is not a cheap smoke test. The redundant root test path has been removed; pytest discovers `tests/`.
 The existing tox environments remain available and can install dependencies/run
 benchmarks. They were not launched during Phase 1.
 

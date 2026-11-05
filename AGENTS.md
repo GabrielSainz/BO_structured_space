@@ -16,6 +16,7 @@ acquisition functions and generative proposals. Preserve scientific behavior.
   protocols and training commands. Root `run.py` is a compatibility entry point.
 - `scripts/experiments/`: existing sweeps. `configs/README.md` indexes actual
   settings in scripts, Python defaults, root environments and `envs/`.
+- `scripts/slurm/`: scheduler entry points; submit from the repository root.
 - `evaluation/`: current local analysis. Package `results/`, `utils/results/`
   and `utils/visualization/` retain older analysis and plotting.
 - `tests/`: structural checks and existing environment-specific integrations.
@@ -36,7 +37,10 @@ change equations, kernels, objectives, proposal distributions, defaults or
 experimental protocols. Document any authorized behavior change. Preserve seeds,
 budgets, objective conventions, configuration and result provenance. Retain
 reasonable import/CLI compatibility; edit canonical modules, not forwarding
-shims. Never delete historical experiments, checkpoints or results.
+shims. Root sweep, report, method and test duplicates were removed in the
+post-migration cleanup; use canonical paths. Installed aliases in `src/` and
+the old loader aliases still support existing imports and serialized classes.
+Never delete historical experiments, checkpoints or results.
 
 ## Computational constraints
 

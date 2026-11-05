@@ -12,6 +12,7 @@ duplicating settings or changing relative paths.
 | Package dependencies and extras | [`../pyproject.toml`](../pyproject.toml), [`../setup.cfg`](../setup.cfg) | Root; existing dependency versions preserved |
 | Additional requirements | [`../requirements.txt`](../requirements.txt), [`../requirements-dev.txt`](../requirements-dev.txt) | Root; overlaps with metadata remain technical debt |
 | Current experiment settings | [`../scripts/experiments/`](../scripts/experiments/) | Root; shell flags, seed loops, diffusion settings and budgets unchanged |
+| Scheduler settings | [`../scripts/slurm/`](../scripts/slurm/) | Submit from the repository root; original SLURM headers and arguments preserved |
 | CLI defaults | [`../src/hdbo_benchmark/experiments/run.py`](../src/hdbo_benchmark/experiments/run.py) | Click options and `_main`; retain the existing `--sufix` spelling |
 | Method defaults | [`../src/hdbo_benchmark/solvers/`](../src/hdbo_benchmark/solvers/) | Constructor defaults and `registry.py`; no extraction to config files |
 | Benchmark setup | [`../src/hdbo_benchmark/benchmarks/load_problems.py`](../src/hdbo_benchmark/benchmarks/load_problems.py) | Existing initialization and objective conventions |

@@ -1,5 +1,7 @@
 # File migration map
 
+> Historical Phase 1 record. The subsequent [cleanup](CLEANUP.md) removed redundant compatibility launchers; see that record for current entry points.
+
 Every original entry point is retained as a compatibility shim. Canonical implementations are edited at their new locations.
 
 | Original path | Canonical path |

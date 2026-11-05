@@ -1,5 +1,7 @@
 # Migration and verification record
 
+> Historical Phase 1 record. The subsequent [cleanup](CLEANUP.md) removed redundant compatibility launchers; see that record for current entry points.
+
 Phase 1, 2026-11-05. Work remains uncommitted on `refactor/agent-repo`.
 
 ## Implemented structural changes

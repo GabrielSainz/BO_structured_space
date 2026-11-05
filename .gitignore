@@ -30,7 +30,6 @@ wandb/
 data/small_molecule_datasets/raw/
 data/small_molecule_datasets/processed/*.npz
 data/small_molecule_datasets/processed/*.pkl
-data/small_molecule_datasets/processed/*.pkl
 data/small_molecule_datasets/processed/*.old.*
 data/small_molecule_datasets/processed/zinc250k.csv
 data/trained_models/zinc_250k
