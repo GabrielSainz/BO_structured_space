@@ -1,0 +1,471 @@
+{
+  "seed": 1,
+  "latent_shape": [
+    3,
+    128
+  ],
+  "bounds": [
+    -10.0,
+    10.0
+  ],
+  "decoded_smiles": [
+    "CC=C1[C@H1]C(C)=CC(=O)N=CC(C)C=CC=CNC=CC#S1",
+    "NCC(CC)C=C1C2=C1OCC(C(C)=CC)=N2",
+    "C[C@H1](NC)C=CC1=C=C1C=O"
+  ],
+  "problems": [
+    {
+      "name": "albuterol_similarity",
+      "passed": true,
+      "y": [
+        [
+          0.16842105263157894
+        ],
+        [
+          0.19999999999999998
+        ],
+        [
+          0.20512820512820512
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "amlodipine_mpo",
+      "passed": true,
+      "y": [
+        [
+          0.006129585167454751
+        ],
+        [
+          0.12589709375875435
+        ],
+        [
+          0.004055150609510011
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "celecoxib_rediscovery",
+      "passed": true,
+      "y": [
+        [
+          0.13675213675213677
+        ],
+        [
+          0.06306306306306306
+        ],
+        [
+          0.041237113402061855
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "deco_hop",
+      "passed": true,
+      "y": [
+        [
+          0.5045439524124257
+        ],
+        [
+          0.5012357884330203
+        ],
+        [
+          0.5008625150940141
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "fexofenadine_mpo",
+      "passed": true,
+      "y": [
+        [
+          0.010020526983118047
+        ],
+        [
+          0.023460014643815145
+        ],
+        [
+          0.0007668700565507318
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "isomer_c7h8n2o2",
+      "passed": true,
+      "y": [
+        [
+          1.282891823608785e-19
+        ],
+        [
+          1.1399918530443554e-12
+        ],
+        [
+          0.1781730517728984
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "isomer_c9h10n2o2pf2cl",
+      "passed": true,
+      "y": [
+        [
+          3.8891115722610075e-08
+        ],
+        [
+          5.476276860109711e-05
+        ],
+        [
+          0.3855343441745787
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "median_1",
+      "passed": true,
+      "y": [
+        [
+          0.06960575579871307
+        ],
+        [
+          0.07042253521126761
+        ],
+        [
+          0.07272727272727272
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "median_2",
+      "passed": true,
+      "y": [
+        [
+          0.07890534607899989
+        ],
+        [
+          0.06162238346624347
+        ],
+        [
+          0.0313851490481129
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "mestranol_similarity",
+      "passed": true,
+      "y": [
+        [
+          0.12452543659832954
+        ],
+        [
+          0.2175226586102719
+        ],
+        [
+          0.11428571428571428
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "osimetrinib_mpo",
+      "passed": true,
+      "y": [
+        [
+          0.0023177768489378472
+        ],
+        [
+          0.014544062858825424
+        ],
+        [
+          0.0011301138386032668
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "perindopril_mpo",
+      "passed": true,
+      "y": [
+        [
+          0.003619945980597207
+        ],
+        [
+          0.005262960107474498
+        ],
+        [
+          0.004602946158843408
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "ranolazine_mpo",
+      "passed": true,
+      "y": [
+        [
+          0.0820352968939302
+        ],
+        [
+          0.024796270695520508
+        ],
+        [
+          0.0009977658975305437
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "rdkit_logp",
+      "passed": true,
+      "y": [
+        [
+          4.153490000000003
+        ],
+        [
+          2.5603000000000007
+        ],
+        [
+          0.8147
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "rdkit_qed",
+      "passed": true,
+      "y": [
+        [
+          0.7295624079782851
+        ],
+        [
+          0.8094117162103209
+        ],
+        [
+          0.47323424985525037
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "sa_tdc",
+      "passed": true,
+      "y": [
+        [
+          5.728554312921255
+        ],
+        [
+          4.625971616753368
+        ],
+        [
+          5.273154176447357
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "scaffold_hop",
+      "passed": true,
+      "y": [
+        [
+          0.34019975031210986
+        ],
+        [
+          0.3352007469654528
+        ],
+        [
+          0.33463668947539915
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "sitagliptin_mpo",
+      "passed": true,
+      "y": [
+        [
+          1.8563731049208404e-10
+        ],
+        [
+          0.0008214110814142114
+        ],
+        [
+          9.655468408578885e-10
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "thiothixene_rediscovery",
+      "passed": true,
+      "y": [
+        [
+          0.12213740458015267
+        ],
+        [
+          0.1
+        ],
+        [
+          0.05504587155963303
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "troglitazone_rediscovery",
+      "passed": true,
+      "y": [
+        [
+          0.12121212121212122
+        ],
+        [
+          0.09016393442622951
+        ],
+        [
+          0.04504504504504504
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "valsartan_smarts",
+      "passed": true,
+      "y": [
+        [
+          0.0
+        ],
+        [
+          0.0
+        ],
+        [
+          0.0
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "zaleplon_mpo",
+      "passed": true,
+      "y": [
+        [
+          0.12948823588594707
+        ],
+        [
+          0.04466287666774696
+        ],
+        [
+          2.2430233799832737e-06
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    },
+    {
+      "name": "jnk3",
+      "passed": false,
+      "error": {
+        "type": "ValueError",
+        "message": "node array from the pickle has an incompatible dtype:\n- expected: {'names': ['left_child', 'right_child', 'feature', 'threshold', 'impurity', 'n_node_samples', 'weighted_n_node_samples', 'missing_go_to_left'], 'formats': ['<i8', '<i8', '<i8', '<f8', '<f8', '<i8', '<f8', 'u1'], 'offsets': [0, 8, 16, 24, 32, 40, 48, 56], 'itemsize': 64}\n- got     : [('left_child', '<i8'), ('right_child', '<i8'), ('feature', '<i8'), ('threshold', '<f8'), ('impurity', '<f8'), ('n_node_samples', '<i8'), ('weighted_n_node_samples', '<f8')]"
+      }
+    },
+    {
+      "name": "gsk3_beta",
+      "passed": false,
+      "error": {
+        "type": "ValueError",
+        "message": "node array from the pickle has an incompatible dtype:\n- expected: {'names': ['left_child', 'right_child', 'feature', 'threshold', 'impurity', 'n_node_samples', 'weighted_n_node_samples', 'missing_go_to_left'], 'formats': ['<i8', '<i8', '<i8', '<f8', '<f8', '<i8', '<f8', 'u1'], 'offsets': [0, 8, 16, 24, 32, 40, 48, 56], 'itemsize': 64}\n- got     : [('left_child', '<i8'), ('right_child', '<i8'), ('feature', '<i8'), ('threshold', '<f8'), ('impurity', '<f8'), ('n_node_samples', '<i8'), ('weighted_n_node_samples', '<f8')]"
+      }
+    },
+    {
+      "name": "drd2_docking",
+      "passed": true,
+      "y": [
+        [
+          0.012625009247861857
+        ],
+        [
+          0.002352337585408189
+        ],
+        [
+          0.006058753969105875
+        ]
+      ],
+      "shape": [
+        3,
+        1
+      ]
+    }
+  ]
+}

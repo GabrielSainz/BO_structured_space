@@ -54,6 +54,8 @@ Use the established Python 3.10 environment. Dependency-free checks:
 `python -m unittest tests.test_structure`. Existing pytest integration tests
 need optional dependencies and can execute real objectives; select deliberately.
 
-Phase 1 is architecture-only: zero-score diagnostics and scientific fixes belong
-to future work. Stay on the authorized refactoring branch; do not change `main`,
+The original Phase 1 was architecture-only. For subsequent benchmark work, read
+`docs/PMO_DIAGNOSTICS.md`: JNK3/GSK3β need a compatible oracle runtime, while
+Valsartan SMARTS has validated sparse rewards. Do not silently change scores or
+objective direction. Stay on the authorized refactoring branch; do not change `main`,
 commit, push or merge without explicit user instruction.

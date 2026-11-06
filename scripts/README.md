@@ -1,5 +1,8 @@
 # Existing experiment launch scripts
 
+Objective diagnostics are under `scripts/diagnostics/`; see
+[the PMO report](../docs/PMO_DIAGNOSTICS.md) for their commands and scope.
+
 Run these from the **repository root** after activating the appropriate existing
 environment. Invoke the scripts here directly; redundant root `run*.sh`
 forwarders have been removed. Experiment commands, settings and loops are

@@ -98,7 +98,13 @@ when supported. It calls `step()` with periodic saves where available, otherwise
 uses the existing `solve()` branch. This sequence and exception handling are
 unchanged.
 
-PMO uses SELFIES and ten initial molecules in the existing loader. Other loader
+PMO uses SELFIES and ten initial molecules in the existing loader. The subsequent
+[objective audit](PMO_DIAGNOSTICS.md) adds TDC error propagation: in-process
+scalar oracle calls use the one-item list API so evaluator failures are visible.
+Successful scores and evaluation counts are preserved. TDC fallback package
+metadata also supports repeated initialization in one process. JNK3/GSK3β
+remain blocked by classifier/runtime compatibility in the current environment.
+Other loader
 branches cover `rfp_rasp`, `rfp_foldx_stability`, Ehrlich tiny/small/large and
 `pest_control_equivalent`. Initialization counts and objective conventions stay
 in the loader, not in a new config layer. The default CLI function string remains

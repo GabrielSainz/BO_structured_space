@@ -7,7 +7,8 @@ The existing Python package is `hdbo_benchmark`.
 
 Phase 1 reorganizes existing implementations and entry points. It does not
 change algorithms, defaults, evaluation budgets or benchmark definitions.
-Scientific diagnostics and new research methods are future work.
+Subsequent objective diagnostics and compatibility fixes are documented below;
+new research methods remain future work.
 
 ## Existing methods
 
@@ -146,6 +147,15 @@ printing. W&B settings remain in `utils/constants.py`; use the existing
 `--wandb-mode disabled` for local verification.
 
 ## Checks and documentation
+
+The [25-task PMO diagnostic report](docs/PMO_DIAGNOSTICS.md) identifies JNK3/GSK3β
+classifier incompatibilities and explains Valsartan SMARTS zeros. The loader
+now exposes TDC evaluator failures instead of accepting hidden error zeros.
+Run the small compatibility and objective controls in the research environment:
+
+```bash
+python -m unittest tests.test_tdc_compat tests.test_pmo_controls tests.test_structure -v
+```
 
 Dependency-free structural checks:
 

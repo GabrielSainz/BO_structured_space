@@ -21,6 +21,7 @@ from hdbo_benchmark.utils.experiments.load_metadata_for_vaes import (
 )
 from hdbo_benchmark.utils.tdc_compat import (
     ensure_tdc_is_available,
+    expose_tdc_evaluation_errors,
     patch_broken_tdc_chem_utils,
 )
 from hdbo_benchmark.utils.logging.wandb_observer import (
@@ -59,6 +60,7 @@ def _load_pmo_problem(function_name: str) -> Problem:
         alphabet=load_alphabet_for_pmo(),
         max_sequence_length=load_sequence_length_for_pmo(),
     )
+    expose_tdc_evaluation_errors(problem.black_box)
     problem.data_package = RandomMoleculesDataPackage(
         string_representation="SELFIES",
         n_molecules=10,
