@@ -26,7 +26,7 @@ from hdbo_benchmark.utils.constants import DEVICE, ROOT_DIR
 from hdbo_benchmark.utils.experiments.load_generative_models import (
     load_generative_model_and_bounds,
 )
-from hdbo_benchmark.utils.experiments.load_solvers import (
+from hdbo_benchmark.solvers.registry import (
     DISCRETE_SPACE_SOLVERS,
     SOLVER_NAMES,
     SOLVERS_THAT_DONT_ALLOW_CUSTOM_INPUTS,

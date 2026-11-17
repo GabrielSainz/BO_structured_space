@@ -1,0 +1,74 @@
+<Problem: albuterol_similarity x0: [['[C]' '[C]' '[Branch1]' '[C]' '[C]' '[Branch1]' '[C]' '[C]' '[C@H1]'
+  '[C]' '[C]' '[C]' '[=C]' '[Branch2]' '[Ring1]' '[S]' '[S]' '[C]'
+  '[Branch2]' '[Ring1]' '[Ring1]' '[N]' '[C]' '[=Branch1]' '[C]' '[=O]'
+  '[C]' '[O]' '[C]' '[=C]' '[C]' '[=C]' '[Branch1]' '[C]' '[Cl]' '[C]'
+  '[=C]' '[Ring1]' '[#Branch1]' '[=C]' '[Ring1]' '[P]' '[C]' '[Branch1]'
+  '[C]' '[N]' '[=O]' '[C]' '[Ring2]' '[Ring1]' '[Branch2]']] data_package: DataPackage(unsupervised_data=(10, 70), supervised_data=(10, 70))>
+COWBOYS(black_box=LambdaBlackBox(L=128, num_evaluations=0), x0=[[0.50204027 0.49825877 0.51569533 ... 0.50174755 0.49988198 0.50210965]
+ [0.50035626 0.49978915 0.5333676  ... 0.49899945 0.5022059  0.5003687 ]
+ [0.4974266  0.4970703  0.6207951  ... 0.5005651  0.49665293 0.49874124]
+ ...
+ [0.4998381  0.49632496 0.40335912 ... 0.49913892 0.50052947 0.49774265]
+ [0.5023005  0.50185406 0.4725097  ... 0.4999373  0.49941882 0.5039427 ]
+ [0.499058   0.50388086 0.3673986  ... 0.5024967  0.5027555  0.4970232 ]], y0=[[0.28828829]
+ [0.25531915]
+ [0.32941176]
+ [0.18245614]
+ [0.15053763]
+ [0.22666667]
+ [0.24126984]
+ [0.28673835]
+ [0.25263158]
+ [0.2640264 ]])
+collected at 10 points so far, with best score so far as 0.32941176470588235
+Run failed with OSError after 0 optimization iterations. Saving partial progress before exiting.
+Traceback (most recent call last):
+  File "<REPOSITORY>\run.py", line 542, in <module>
+    main()
+  File "<CONDA_ENV>\lib\site-packages\click\core.py", line 1485, in __call__
+    return self.main(*args, **kwargs)
+  File "<CONDA_ENV>\lib\site-packages\click\core.py", line 1406, in main
+    rv = self.invoke(ctx)
+  File "<CONDA_ENV>\lib\site-packages\click\core.py", line 1269, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+  File "<CONDA_ENV>\lib\site-packages\click\core.py", line 824, in invoke
+    return callback(*args, **kwargs)
+  File "<REPOSITORY>\run.py", line 516, in main
+    _main(
+  File "<REPOSITORY>\run.py", line 456, in _main
+    raise run_error
+  File "<REPOSITORY>\run.py", line 403, in _main
+    solver.step()
+  File "<CONDA_ENV>\lib\site-packages\poli_baselines\core\step_by_step_solver.py", line 63, in step
+    x = self.next_candidate()
+  File "<REPOSITORY>\cowboys.py", line 139, in next_candidate
+    model = self._fit_model(SingleTaskGP, prev_fingerprints, y)
+  File "<REPOSITORY>\cowboys.py", line 98, in _fit_model
+    fit_gpytorch_mll(mll)
+  File "<CONDA_ENV>\lib\site-packages\botorch\fit.py", line 114, in fit_gpytorch_mll
+    return FitGPyTorchMLL(
+  File "<CONDA_ENV>\lib\site-packages\botorch\utils\dispatcher.py", line 95, in __call__
+    return func(*args, **kwargs)
+  File "<CONDA_ENV>\lib\site-packages\botorch\fit.py", line 214, in _fit_fallback
+    result = optimizer(mll, closure=closure, **optimizer_kwargs)
+  File "<CONDA_ENV>\lib\site-packages\botorch\optim\fit.py", line 94, in fit_gpytorch_mll_scipy
+    result = scipy_minimize(
+  File "<CONDA_ENV>\lib\site-packages\botorch\optim\core.py", line 115, in scipy_minimize
+    raw = minimize_with_timeout(
+  File "<CONDA_ENV>\lib\site-packages\botorch\optim\utils\timeout.py", line 85, in minimize_with_timeout
+    with threadpool_limits(limits=1, user_api="blas"):
+  File "<CONDA_ENV>\lib\site-packages\threadpoolctl.py", line 794, in __init__
+    super().__init__(ThreadpoolController(), limits=limits, user_api=user_api)
+  File "<CONDA_ENV>\lib\site-packages\threadpoolctl.py", line 586, in __init__
+    self._original_info = self._controller.info()
+  File "<CONDA_ENV>\lib\site-packages\threadpoolctl.py", line 829, in info
+    return [lib_controller.info() for lib_controller in self.lib_controllers]
+  File "<CONDA_ENV>\lib\site-packages\threadpoolctl.py", line 829, in <listcomp>
+    return [lib_controller.info() for lib_controller in self.lib_controllers]
+  File "<CONDA_ENV>\lib\site-packages\threadpoolctl.py", line 125, in info
+    "num_threads": self.num_threads,
+  File "<CONDA_ENV>\lib\site-packages\threadpoolctl.py", line 138, in num_threads
+    return self.get_num_threads()
+  File "<CONDA_ENV>\lib\site-packages\threadpoolctl.py", line 444, in get_num_threads
+    return get_func()
+OSError: [WinError -1066598273] Windows Error 0xc06d007f

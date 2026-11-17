@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from hdbo_benchmark.utils.experiments.load_solvers import SOLVER_NAMES
+from hdbo_benchmark.solvers.registry import SOLVER_NAMES
 
 current_date = datetime.now().strftime("%Y-%m-%d")
 

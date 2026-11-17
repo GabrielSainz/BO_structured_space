@@ -1,0 +1,168 @@
+{
+  "date": "2026-11-05",
+  "branch": "refactor/agent-repo",
+  "baseline": {
+    "exit_code": 1,
+    "command": [
+      "python",
+      "run.py",
+      "--function-name",
+      "albuterol_similarity",
+      "--solver-name",
+      "cowboys",
+      "--n-dimensions",
+      "128",
+      "--max-iter",
+      "1",
+      "--seed",
+      "1",
+      "--no-strict-on-hash",
+      "--wandb-mode",
+      "disabled",
+      "--tag",
+      "phase1-structure",
+      "--sufix",
+      "phase1_before_20261105"
+    ],
+    "seconds": 29.57,
+    "environment": {
+      "HDBO_TORCH_DEVICE": "cpu",
+      "WANDB_MODE": "disabled",
+      "HF_HUB_OFFLINE": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "TRANSFORMERS_OFFLINE": "1",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  "after": {
+    "exit_code": 1,
+    "command": [
+      "python",
+      "run.py",
+      "--function-name",
+      "albuterol_similarity",
+      "--solver-name",
+      "cowboys",
+      "--n-dimensions",
+      "128",
+      "--max-iter",
+      "1",
+      "--seed",
+      "1",
+      "--no-strict-on-hash",
+      "--wandb-mode",
+      "disabled",
+      "--tag",
+      "phase1-structure",
+      "--sufix",
+      "phase1_after_20261105"
+    ],
+    "seconds": 15.15,
+    "environment": {
+      "HDBO_TORCH_DEVICE": "cpu",
+      "WANDB_MODE": "disabled",
+      "HF_HUB_OFFLINE": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "TRANSFORMERS_OFFLINE": "1",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  "static_checks": {
+    "preserved_files": 150,
+    "compiled_python_files": 131,
+    "historical_artifacts_unchanged": 1902,
+    "unexpected_differences": []
+  },
+  "runtime_checks": {
+    "aliases": 8,
+    "local_solver_imports": 5,
+    "legacy_pickle_classes": 3,
+    "cli_help": "passed",
+    "comparison": {
+      "cowboys_albuterol_similarity_1.npy": "exactly equal",
+      "cowboys_albuterol_similarity_1_history.npz": {
+        "x": [
+          10,
+          128
+        ],
+        "y": [
+          10,
+          1
+        ],
+        "best_performance": [
+          1
+        ],
+        "bo_iteration": [
+          0
+        ],
+        "best_so_far_objective": [
+          0
+        ],
+        "mean_selected_nearest_previous_tanimoto_distance": [
+          0
+        ],
+        "cumulative_distinct_decoded_molecules": [
+          0
+        ],
+        "new_distinct_decoded_molecules": [
+          0
+        ]
+      },
+      "cowboys_albuterol_similarity_1_iteration_results.json": "exactly equal",
+      "cowboys_albuterol_similarity_1_status.json": {
+        "status": "failed",
+        "completed_iterations": 0,
+        "best_value": 0.32941176470588235,
+        "history_file": "cowboys_albuterol_similarity_1_history.npz",
+        "iteration_results_enabled": true,
+        "iteration_results_file": "cowboys_albuterol_similarity_1_iteration_results.json"
+      }
+    }
+  },
+  "shell_checks": {
+    "checked": 20,
+    "errors": [],
+    "mode": "normalized text on stdin; no experiments executed"
+  },
+  "artifact_sha256": {
+    "results/new_vae_10_chain_100_steps_with_stoch_sampling_phase1_before_20261105/cowboys_albuterol_similarity_1.npy": "c7accf647748d82ab362f52cf0dd331d3418566bafa06899802d73fab055e27e",
+    "results/new_vae_10_chain_100_steps_with_stoch_sampling_phase1_before_20261105/cowboys_albuterol_similarity_1_history.npz": "314656a4a827a5a6d0265903adf752206a32fc181d72fd1a24db1bc53ee7f4f1",
+    "results/new_vae_10_chain_100_steps_with_stoch_sampling_phase1_before_20261105/cowboys_albuterol_similarity_1_iteration_results.json": "04874fb3676653470f669974b2ec8232d4c451196e82c61d794239473d08bcab",
+    "results/new_vae_10_chain_100_steps_with_stoch_sampling_phase1_before_20261105/cowboys_albuterol_similarity_1_status.json": "aec1709dce09a16926aeeadcdb5eb1094b9fe632c7dfa6ffc8f6c11b9b6daebd",
+    "results/new_vae_10_chain_100_steps_with_stoch_sampling_phase1_after_20261105/cowboys_albuterol_similarity_1.npy": "c7accf647748d82ab362f52cf0dd331d3418566bafa06899802d73fab055e27e",
+    "results/new_vae_10_chain_100_steps_with_stoch_sampling_phase1_after_20261105/cowboys_albuterol_similarity_1_history.npz": "314656a4a827a5a6d0265903adf752206a32fc181d72fd1a24db1bc53ee7f4f1",
+    "results/new_vae_10_chain_100_steps_with_stoch_sampling_phase1_after_20261105/cowboys_albuterol_similarity_1_iteration_results.json": "04874fb3676653470f669974b2ec8232d4c451196e82c61d794239473d08bcab",
+    "results/new_vae_10_chain_100_steps_with_stoch_sampling_phase1_after_20261105/cowboys_albuterol_similarity_1_status.json": "aec1709dce09a16926aeeadcdb5eb1094b9fe632c7dfa6ffc8f6c11b9b6daebd"
+  },
+  "cli_checks": [
+    {
+      "command": [
+        "python",
+        "-m",
+        "hdbo_benchmark.experiments.run",
+        "--help"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python",
+        "reports/plot_iteration_metrics.py",
+        "--help"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "hdbo_benchmark.evaluation.plot_iteration_metrics",
+        "--help"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "solver_files_byte_identical": 5
+}

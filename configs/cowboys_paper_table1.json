@@ -1,0 +1,119 @@
+{
+  "source": "https://arxiv.org/html/2507.03910v1#S7.T1",
+  "table": "Table 1",
+  "repetitions": 5,
+  "initial_molecules": 10,
+  "bo_iterations": 300,
+  "batch_size": 1,
+  "latent_dim": 128,
+  "num_chains": 1,
+  "n_steps": 100,
+  "spread": "standard deviation",
+  "notes": [
+    "Section 7.2 specifies 300 BO steps after 10 initial molecules; the caption says 300 evaluations.",
+    "sa_tdc is reported in the source's maximizing convention; raw SA is lower-is-easier. No objective direction is changed here."
+  ],
+  "tasks": {
+    "albuterol_similarity": {
+      "mean": 0.472,
+      "sd": 0.08
+    },
+    "amlodipine_mpo": {
+      "mean": 0.477,
+      "sd": 0.04
+    },
+    "celecoxib_rediscovery": {
+      "mean": 0.217,
+      "sd": 0.02
+    },
+    "deco_hop": {
+      "mean": 0.57,
+      "sd": 0.01
+    },
+    "drd2_docking": {
+      "mean": 0.342,
+      "sd": 0.17
+    },
+    "fexofenadine_mpo": {
+      "mean": 0.682,
+      "sd": 0.02
+    },
+    "gsk3_beta": {
+      "mean": 0.368,
+      "sd": 0.03
+    },
+    "isomer_c7h8n2o2": {
+      "mean": 1,
+      "sd": 0
+    },
+    "isomer_c9h10n2o2pf2cl": {
+      "mean": 0.69,
+      "sd": 0.08
+    },
+    "jnk3": {
+      "mean": 0.138,
+      "sd": 0.05
+    },
+    "median_1": {
+      "mean": 0.198,
+      "sd": 0.02
+    },
+    "median_2": {
+      "mean": 0.162,
+      "sd": 0.01
+    },
+    "mestranol_similarity": {
+      "mean": 0.384,
+      "sd": 0.01
+    },
+    "osimetrinib_mpo": {
+      "mean": 0.722,
+      "sd": 0.03
+    },
+    "perindopril_mpo": {
+      "mean": 0.382,
+      "sd": 0.04
+    },
+    "ranolazine_mpo": {
+      "mean": 0.648,
+      "sd": 0.04
+    },
+    "rdkit_logp": {
+      "mean": 10.678,
+      "sd": 0.99
+    },
+    "rdkit_qed": {
+      "mean": 0.909,
+      "sd": 0.03
+    },
+    "sa_tdc": {
+      "mean": 7.909,
+      "sd": 0.07
+    },
+    "scaffold_hop": {
+      "mean": 0.435,
+      "sd": 0.01
+    },
+    "sitagliptin_mpo": {
+      "mean": 0.259,
+      "sd": 0.07
+    },
+    "thiothixene_rediscovery": {
+      "mean": 0.247,
+      "sd": 0.03
+    },
+    "troglitazone_rediscovery": {
+      "mean": 0.205,
+      "sd": 0.02
+    },
+    "valsartan_smarts": {
+      "mean": 0,
+      "sd": 0
+    },
+    "zaleplon_mpo": {
+      "mean": 0.379,
+      "sd": 0.05
+    }
+  },
+  "checkpoint_sha256": "7c29cd598dd42b8dd1a9ddf84ffacd8bfc3131912eb2af684d5e0cedf3a55513"
+}

@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-17",
+  "branch": "refactor/agent-repo",
+  "head": "c041f06934d0934e974bd72c14087c3b4c7a86d4",
+  "versions": {
+    "numpy": "1.26.4",
+    "torch": "2.10.0",
+    "botorch": "0.16.1",
+    "gpytorch": "1.15.2",
+    "scikit-learn": "1.7.2"
+  },
+  "focused_tests": {
+    "command": "python -m unittest tests.test_structure tests.test_cowboys_fidelity tests.test_cowboys_paper_report -v",
+    "run": 17,
+    "passed": 17
+  },
+  "bash_syntax": {
+    "command": "bash -n scripts/experiments/run.sh",
+    "passed": true
+  },
+  "direct_python_smoke": {
+    "status": "failed",
+    "reason": "Existing Windows BLAS/threadpool error 0xc06d007f",
+    "log": "logs/verification_corrected_pcn_20261117T090506.log",
+    "completed_iterations": 0
+  },
+  "activated_conda_smoke": {
+    "status": {
+      "solver_name": "cowboys",
+      "function_name": "albuterol_similarity",
+      "seed": 1,
+      "initial_history_size": 10,
+      "status": "completed",
+      "completed_iterations": 1,
+      "best_value": 0.32941176470588235,
+      "history_file": "cowboys_albuterol_similarity_1_history.npz",
+      "iteration_results_enabled": true,
+      "iteration_results_file": "cowboys_albuterol_similarity_1_iteration_results.json",
+      "diagnostic_objective_evaluations_enabled": false,
+      "solver_configuration": {
+        "implementation": "cowboys_corrected_pcn_v1",
+        "latent_sampling_coordinates": "raw_vae_standard_normal",
+        "history_coordinates": "normalized",
+        "gp_observations": "actual_evaluated_structures",
+        "novelty": "canonical_smiles",
+        "threshold_policy": "fixed_incumbent",
+        "batch_size": 1,
+        "latent_dim": 128,
+        "num_chains": 1,
+        "n_steps": 100,
+        "max_sampling_steps": 10000,
+        "beta_adaptation": "upstream_diminishing_log_beta_target_0.234",
+        "vae_bounds": [
+          -10.0,
+          10.0
+        ],
+        "vae_checkpoint": "<repo>/data/trained_models/training_vae_on_zinc_250k/latent_dim-128-batch_size-512-lr-0.0005-seed-1.pt",
+        "vae_checkpoint_sha256": "7c29cd598dd42b8dd1a9ddf84ffacd8bfc3131912eb2af684d5e0cedf3a55513"
+      }
+    },
+    "elapsed_seconds": 16.969,
+    "history_shapes": {
+      "x": [
+        11,
+        128
+      ],
+      "y": [
+        11,
+        1
+      ],
+      "structures": [
+        11
+      ]
+    },
+    "initial_best": 0.32941176470588235,
+    "selected_y": [
+      [
+        0.14492753623188404
+      ]
+    ],
+    "selected_smiles": [
+      "C=C(F)C(F)=CC[C@H](C)N(C)C(=O)CNC(=O)CCC(C)C"
+    ],
+    "diagnostic_candidates": 10,
+    "diagnostic_objective_mean": null,
+    "log": "logs/verification_conda_pcn_20261117T090618.log"
+  },
+  "script_smoke_evidence": "cowboys_script_smoke.json",
+  "classifier_preflight_evidence": "cowboys_classifier_preflight.json",
+  "full_benchmarks_run": false,
+  "source_sha256": {
+    "src/hdbo_benchmark/solvers/cowboys.py": "71cdf0001ffa0dc7a49be9f4d6c42ebf5204301238a9f1589c18bde82d1bf9b9",
+    "src/hdbo_benchmark/benchmarks/problem_transformations.py": "dc55c59ccde45a8c14f84f5d117f4576f293b1de98b24ebcec86af94107a0107",
+    "src/hdbo_benchmark/experiments/run.py": "00a1165a6eb1c59893bf8e2df9d0dfb23aaccd73e027cb96080291cdbcd779e8",
+    "src/hdbo_benchmark/utils/logging/iteration_metrics.py": "da4dbefd8bd4e31009c31ee6cd33b57d7da92b6ba8aeab4bdd127a8db0730d1a",
+    "src/hdbo_benchmark/evaluation/compare_cowboys_paper.py": "8d15c1f59de5ad86e8b36a800b26d2844e378bb814b1d7a1c8d9558f7c39c86e",
+    "scripts/experiments/run.sh": "8f17f2605ccfa88b27c0874a2c0e0f4eab15989c921e0348bef467cceaab3f09",
+    "configs/cowboys_paper_table1.json": "fe7230eec0d6a6c9e261ed278d44cbbc24e7537e8280829909df5ddabe4d5ad2"
+  }
+}

@@ -1,0 +1,2 @@
+# Keep the corrected launcher executable by Bash after Windows checkouts.
+/scripts/experiments/run.sh text eol=lf

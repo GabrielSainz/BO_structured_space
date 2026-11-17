@@ -3,11 +3,11 @@ import os
 import pytest
 from poli.benchmarks import PMOBenchmark
 
-from hdbo_benchmark.utils.experiments.load_solvers import (
+from hdbo_benchmark.solvers.registry import (
     SOLVER_NAME_TO_ENV,
     SOLVER_NAMES,
 )
-from run import _main
+from hdbo_benchmark.experiments.run import _main
 
 SOLVERS_THAT_RUN_IN_BASE_ENV = [
     solver_name

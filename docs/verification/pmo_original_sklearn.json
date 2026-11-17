@@ -1,0 +1,40 @@
+{
+  "versions": {
+    "python": "3.8.20",
+    "scikit-learn": "0.23.0",
+    "numpy": "1.19.5",
+    "scipy": "1.5.4"
+  },
+  "models": {
+    "jnk3": {
+      "sha256": "cde8576fb4fa3f60b9f258ff9cf1b9ff346eb50d196d5cbbe25965efc1864889",
+      "predictions": {
+        "ethanol": 0.0,
+        "aspirin": 0.0,
+        "poli_example": 0.01,
+        "valsartan_motif": 0.01,
+        "valsartan": 0.04
+      }
+    },
+    "gsk3b": {
+      "sha256": "d3a20701b80e5179c88c3ad4dc3483dd7ab35c50dc055c6773a7f5b63e89b6d5",
+      "predictions": {
+        "ethanol": 0.0,
+        "aspirin": 0.0,
+        "poli_example": 0.03,
+        "valsartan_motif": 0.02,
+        "valsartan": 0.11
+      }
+    },
+    "drd2": {
+      "sha256": "ef1f00e47d5e4670a45b0a4178db3c41b2e1aa9dad7113ac9d0f58e3f9d67532",
+      "predictions": {
+        "ethanol": 0.005215657676740005,
+        "aspirin": 0.00030779248192998733,
+        "poli_example": 0.0015465365340340924,
+        "valsartan_motif": 0.00037718562499579897,
+        "valsartan": 0.001644542101383211
+      }
+    }
+  }
+}

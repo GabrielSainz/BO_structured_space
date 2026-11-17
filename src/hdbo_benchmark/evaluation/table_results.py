@@ -1,4 +1,4 @@
-# python reports/table_results.py
+# python -m hdbo_benchmark.evaluation.table_results
 
 from pathlib import Path
 import re

@@ -20,7 +20,7 @@ def build_iteration_metric_artifacts(
     history_y: np.ndarray,
     initial_history_size: int,
     completed_iterations: int,
-    evaluate_top_candidate_objectives: bool = True,
+    evaluate_top_candidate_objectives: bool = False,
 ) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
     history_x = np.asarray(history_x, dtype=float)
     history_y = np.asarray(history_y, dtype=float).reshape(-1)
@@ -228,6 +228,11 @@ def build_iteration_metric_artifacts(
 def _decode_unit_latents_to_structures(solver: Any, unit_latents: np.ndarray) -> list[str]:
     if unit_latents.size == 0:
         return []
+    observed = getattr(solver, "observed_structures", None)
+    if observed is not None:
+        if len(observed) < len(unit_latents):
+            raise ValueError("Observed structures and metric history are misaligned")
+        return list(observed[:len(unit_latents)])
     if not hasattr(solver, "vae") or not hasattr(solver.vae, "decode_to_string_array"):
         raise ValueError("Solver does not expose a VAE decoder for iteration metrics.")
 

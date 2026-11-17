@@ -2,11 +2,11 @@
 
 Examples
 --------
-python reports/plot_iteration_metrics.py --problem zaleplon_mpo --methods cowboys nflow dgbo --stride 10
-python reports/plot_iteration_metrics.py --problems all --methods cowboys nflow dgbo --stride 10
-python reports/plot_iteration_metrics.py --problems osimetrinib_mpo median_2 amlodipine_mpo --methods dgbo nflow3 cowboys --folders gs10_clip20_dgbo_iteration new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration --seeds 1 2 3 4 5 --stride 10
-python reports/plot_iteration_metrics.py --problems all --folders gs10_clip20_dgbo_iteration new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration --methods dgbo nflow3 cowboys --seeds 1 2 3 4 5 --stride 10
-python reports/plot_iteration_metrics.py --problems all --folders gs10_clip20_dgbo_iteration2 new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration2 new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration2 --methods dgbo nflow3 cowboys --seeds 1 2 3 4 5 --stride 10
+python -m hdbo_benchmark.evaluation.plot_iteration_metrics --problem zaleplon_mpo --methods cowboys nflow dgbo --stride 10
+python -m hdbo_benchmark.evaluation.plot_iteration_metrics --problems all --methods cowboys nflow dgbo --stride 10
+python -m hdbo_benchmark.evaluation.plot_iteration_metrics --problems osimetrinib_mpo median_2 amlodipine_mpo --methods dgbo nflow3 cowboys --folders gs10_clip20_dgbo_iteration new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration --seeds 1 2 3 4 5 --stride 10
+python -m hdbo_benchmark.evaluation.plot_iteration_metrics --problems all --folders gs10_clip20_dgbo_iteration new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration --methods dgbo nflow3 cowboys --seeds 1 2 3 4 5 --stride 10
+python -m hdbo_benchmark.evaluation.plot_iteration_metrics --problems all --folders gs10_clip20_dgbo_iteration2 new_vae_10_chain_100_steps_with_stoch_sampling_nflow3_iteration2 new_vae_10_chain_100_steps_with_stoch_sampling_cowboys_iteration2 --methods dgbo nflow3 cowboys --seeds 1 2 3 4 5 --stride 10
 """
 
 # iterations

@@ -23,7 +23,7 @@ from hdbo_benchmark.utils.experiments.load_metadata_for_vaes import (
     load_alphabet_for_pmo,
     load_sequence_length_for_pmo,
 )
-from hdbo_benchmark.utils.experiments.load_solvers import (
+from hdbo_benchmark.solvers.registry import (
     SOLVER_NAMES,
     load_solver_class,
 )

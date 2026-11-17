@@ -1,6 +1,6 @@
 #!/bin/bash
-# chmod +x run_iterations_nf.sh
-# ./run_iterations_nf.sh
+# chmod +x scripts/experiments/run_iterations_nf.sh
+# bash scripts/experiments/run_iterations_nf.sh
 for i in {1..5}
 do
     python run.py --function-name osimetrinib_mpo --solver-name cowboys_flow_2 --max-iter 300 --seed $i --no-strict-on-hash --sufix "nflow3_iteration2" --save-iteration-results --checkpoint-every 1

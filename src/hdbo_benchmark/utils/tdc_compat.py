@@ -7,6 +7,46 @@ import types
 from pathlib import Path
 
 
+class _StrictScalarTDCOracle:
+    """Use TDC's list path, which propagates evaluator errors on valid inputs.
+
+    TDC's scalar path catches every evaluator exception and returns its default
+    value (usually zero). The list path preserves the same valid scores and
+    invalid-SMILES defaults while exposing dependency/model failures.
+    """
+
+    def __init__(self, oracle):
+        self._oracle = oracle
+
+    def __call__(self, smiles, *args, **kwargs):
+        if isinstance(smiles, str):
+            return self._oracle([smiles], *args, **kwargs)[0]
+        return self._oracle(smiles, *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, "_oracle"), name)
+
+    def __setattr__(self, name, value):
+        if name == "_oracle":
+            object.__setattr__(self, name, value)
+        else:
+            setattr(object.__getattribute__(self, "_oracle"), name, value)
+
+
+def expose_tdc_evaluation_errors(black_box) -> bool:
+    """Enable error propagation for an in-process poli TDC black box.
+
+    No objective evaluations are added. Isolated/external black boxes without
+    an accessible Oracle are left alone and return False.
+    """
+    inner = getattr(black_box, "inner_function", None)
+    oracle = getattr(inner, "oracle", None)
+    if oracle is None or isinstance(oracle, _StrictScalarTDCOracle):
+        return False
+    inner.oracle = _StrictScalarTDCOracle(oracle)
+    return True
+
+
 def ensure_tdc_is_available() -> None:
     """Raise a helpful error before poli falls back to Conda isolation.
 
@@ -76,6 +116,9 @@ def patch_broken_tdc_chem_utils() -> None:
 
     tdc_module = types.ModuleType("tdc")
     tdc_module.__file__ = str(tdc_root / "__init__.py")
+    # find_spec() raises ValueError on modules without a spec. Retain package
+    # metadata so a second PMO problem can be initialized in the same process.
+    tdc_module.__spec__ = spec
     tdc_module.__package__ = "tdc"
     tdc_module.__path__ = [str(tdc_root)]
     sys.modules["tdc"] = tdc_module
@@ -85,12 +128,22 @@ def patch_broken_tdc_chem_utils() -> None:
 
     chem_utils_module = types.ModuleType("tdc.chem_utils")
     chem_utils_module.__file__ = str(chem_utils_dir / "__init__.py")
+    chem_utils_module.__spec__ = importlib.util.spec_from_file_location(
+        "tdc.chem_utils",
+        chem_utils_dir / "__init__.py",
+        submodule_search_locations=[str(chem_utils_dir)],
+    )
     chem_utils_module.__package__ = "tdc.chem_utils"
     chem_utils_module.__path__ = [str(chem_utils_dir)]
     sys.modules["tdc.chem_utils"] = chem_utils_module
 
     oracle_pkg = types.ModuleType("tdc.chem_utils.oracle")
     oracle_pkg.__file__ = str(oracle_dir / "__init__.py")
+    oracle_pkg.__spec__ = importlib.util.spec_from_file_location(
+        "tdc.chem_utils.oracle",
+        oracle_dir / "__init__.py",
+        submodule_search_locations=[str(oracle_dir)],
+    )
     oracle_pkg.__package__ = "tdc.chem_utils.oracle"
     oracle_pkg.__path__ = [str(oracle_dir)]
     sys.modules["tdc.chem_utils.oracle"] = oracle_pkg

@@ -4,6 +4,7 @@ of the experiment and the latent dimension.
 """
 
 from pathlib import Path
+import hashlib
 from typing import Literal
 
 import torch
@@ -67,6 +68,8 @@ def load_zinc_vae_from_checkpoint(
     vae = VAESelfies(latent_dim=resolved_latent_dim, device=device)
     vae.load_state_dict(_strip_compiled_prefix_from_state_dict(state_dict))
     vae.eval()
+    vae.checkpoint_path = str(checkpoint_path.resolve())
+    vae.checkpoint_sha256 = hashlib.sha256(checkpoint_path.read_bytes()).hexdigest()
     return vae
 
 

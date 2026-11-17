@@ -1,6 +1,6 @@
 #!/bin/bash
-# chmod +x run_iterations.sh
-# ./run_iterations.sh
+# chmod +x scripts/experiments/run_iterations.sh
+# bash scripts/experiments/run_iterations.sh
 
 for i in {1..10}
 do

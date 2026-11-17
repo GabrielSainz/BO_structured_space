@@ -1,0 +1,46 @@
+{
+  "audit_date": "2026-11-06",
+  "task_count": 25,
+  "integration_passes": [
+    "albuterol_similarity",
+    "amlodipine_mpo",
+    "celecoxib_rediscovery",
+    "deco_hop",
+    "fexofenadine_mpo",
+    "isomer_c7h8n2o2",
+    "isomer_c9h10n2o2pf2cl",
+    "median_1",
+    "median_2",
+    "mestranol_similarity",
+    "osimetrinib_mpo",
+    "perindopril_mpo",
+    "ranolazine_mpo",
+    "rdkit_logp",
+    "rdkit_qed",
+    "sa_tdc",
+    "scaffold_hop",
+    "sitagliptin_mpo",
+    "thiothixene_rediscovery",
+    "troglitazone_rediscovery",
+    "valsartan_smarts",
+    "zaleplon_mpo",
+    "drd2_docking"
+  ],
+  "environment_blocked": [
+    "jnk3",
+    "gsk3_beta"
+  ],
+  "valid_scores_unchanged_by_error_guard": true,
+  "cached_model_hashes_unchanged": true,
+  "unit_tests": {
+    "tdc_and_structure": 7,
+    "reference_control_methods": 2,
+    "final_combined_suite_passed": 9
+  },
+  "baseline_git_revision": "666e310e47f1b5b1d07cd8cae0c7bf56ee4ecac1",
+  "latent_wrapper_passes": 23,
+  "latent_wrapper_blocked": [
+    "jnk3",
+    "gsk3_beta"
+  ]
+}
