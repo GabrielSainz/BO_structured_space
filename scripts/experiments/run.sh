@@ -55,6 +55,7 @@ for seed in "${seeds[@]}"; do
         printf '%s\t%s\t%s\n' "$function_name" "$seed" "$code" >> "$output_dir/sweep_status.tsv"
     done
 done
+"$PYTHON_BIN" -m hdbo_benchmark.evaluation export --results-dir "$output_dir" --planned-bo-steps "$MAX_ITER" || printf 'Metrics export reported issues; see %s/metrics/export_manifest.json.\n' "$output_dir" >&2
 "$PYTHON_BIN" -m hdbo_benchmark.evaluation.compare_cowboys_paper "$output_dir" || exit 1
 printf 'Finished with %s failed runs. Outputs: %s\n' "$failures" "$output_dir"
 [[ "$failures" -eq 0 ]]

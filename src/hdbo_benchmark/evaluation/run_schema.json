@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Offline molecular BO run (adapted reference v1)",
+  "type": "object",
+  "required": ["schema_version", "run_id", "experiment_group_id", "status", "source_result_path", "provenance", "task", "algorithm", "design", "metric_policy", "evaluations", "trajectory", "summary", "missing_reason"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "run_id": {"type": "string", "minLength": 1},
+    "experiment_group_id": {"type": "string"},
+    "status": {"enum": ["completed", "partial", "failed"]},
+    "source_result_path": {"type": "string"},
+    "provenance": {"type": "object", "required": ["adapter", "sources", "export_environment"]},
+    "task": {"type": "object", "required": ["task_name", "direction", "score_transform", "score_normalization"], "properties": {"direction": {"enum": ["maximize", "minimize"]}}},
+    "algorithm": {"type": "object", "required": ["name", "config"]},
+    "design": {"type": "object", "required": ["seed", "n_initial_observed", "bo_steps_planned", "batch_size", "initialization_policy"], "properties": {"bo_steps_planned": {"type": ["integer", "null"], "minimum": 0}, "seed": {"type": "integer"}}},
+    "metric_policy": {"type": "object", "required": ["top_k", "auc_rule", "fingerprint", "diversity_profiles", "valid_observation_policy"]},
+    "evaluations": {"type": "array", "items": {"$ref": "#/$defs/evaluation"}},
+    "trajectory": {"type": "array", "items": {"$ref": "#/$defs/step"}},
+    "summary": {"type": "object", "required": ["full_budget_completed", "auc_scope", "final", "auc", "missing_reason"], "properties": {"full_budget_completed": {"type": "boolean"}, "auc_scope": {"enum": ["full_budget", "partial", "unverified_budget"]}}},
+    "missing_reason": {"type": "object", "additionalProperties": {"type": "string"}}
+  },
+  "$defs": {
+    "nullable_number": {"type": ["number", "null"]},
+    "nullable_count": {"type": ["integer", "null"], "minimum": 0},
+    "quality": {
+      "type": "object", "required": ["best_so_far", "top_1", "top_10", "top_100"],
+      "properties": {"best_so_far": {"$ref": "#/$defs/nullable_number"}, "top_1": {"$ref": "#/$defs/nullable_number"}, "top_10": {"$ref": "#/$defs/nullable_number"}, "top_100": {"$ref": "#/$defs/nullable_number"}}
+    },
+    "evaluation": {
+      "type": "object",
+      "required": ["observation_index", "bo_step", "phase", "smiles", "canonical_smiles", "raw_oracle_score", "score_for_metrics", "valid_molecule", "actual_oracle_call", "is_duplicate", "missing_reason"],
+      "properties": {
+        "observation_index": {"type": "integer", "minimum": 0},
+        "bo_step": {"$ref": "#/$defs/nullable_count"},
+        "phase": {"enum": ["initial", "optimization", null]},
+        "raw_oracle_score": {"$ref": "#/$defs/nullable_number"},
+        "score_for_metrics": {"$ref": "#/$defs/nullable_number"},
+        "valid_molecule": {"type": ["boolean", "null"]},
+        "actual_oracle_call": {"type": ["boolean", "null"]},
+        "is_duplicate": {"type": ["boolean", "null"]},
+        "missing_reason": {"type": "object"}
+      }
+    },
+    "step": {
+      "type": "object", "required": ["bo_step", "cumulative_oracle_calls", "cumulative_observed_evaluations", "n_unique_valid_molecules", "quality", "diversity_by_profile", "missing_reason"],
+      "properties": {
+        "bo_step": {"type": "integer", "minimum": 0},
+        "cumulative_oracle_calls": {"$ref": "#/$defs/nullable_count"},
+        "cumulative_observed_evaluations": {"type": "integer", "minimum": 0},
+        "n_unique_valid_molecules": {"$ref": "#/$defs/nullable_count"},
+        "quality": {"$ref": "#/$defs/quality"},
+        "top_10_internal_diversity": {"$ref": "#/$defs/nullable_number"},
+        "diversity_by_profile": {"type": "object", "required": ["primary"], "additionalProperties": {"type": "object", "required": ["unique_hits", "online_diverse_hits", "distinct_hit_scaffolds"], "properties": {"unique_hits": {"$ref": "#/$defs/nullable_count"}, "online_diverse_hits": {"$ref": "#/$defs/nullable_count"}, "distinct_hit_scaffolds": {"$ref": "#/$defs/nullable_count"}}}}
+      }
+    }
+  }
+}
