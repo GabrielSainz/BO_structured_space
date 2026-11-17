@@ -35,6 +35,10 @@ ROTLSC/
 ```
 
 The main root launcher and installed aliases are compatibility boundaries.
+The subsequent [corrected COWBOYS baseline](COWBOYS_IMPLEMENTATION.md) changes
+its sampling coordinates, observation tracking and default chain count under
+explicit user authorization; the original Phase 1 behavior-preservation claims
+below describe that historical migration.
 Redundant root method, shell, report and test launchers were removed in the
 [post-migration cleanup](CLEANUP.md). No scientific implementations were removed.
 
@@ -127,12 +131,14 @@ Training entry points remain present and must not be run as structural checks.
 
 The current runner uses the working-directory-relative output root:
 
-- Non-diffusion: `results/new_vae_10_chain_100_steps_with_stoch_sampling_<sufix>/`.
+- Corrected COWBOYS: `results/cowboys/<sufix>/`, including original observed
+  structures and sampler/checkpoint provenance in its saved artifacts.
+- Other non-diffusion: `results/new_vae_10_chain_100_steps_with_stoch_sampling_<sufix>/`.
 - Diffusion: `results/diffusion/<existing parameter-derived directory>/`.
 - Filenames include `<solver_name>_<function_name>_<seed>` with `.npy`,
   `_history.npz`, `_iteration_results.json` and `_status.json`, according to the
-  existing saving branches. Some diagnostics may evaluate candidate objectives;
-  this behavior has not been changed or scientifically reviewed.
+  existing saving branches. Diagnostic objective calls now require the explicit
+  `--evaluate-top-candidate-objectives` option; they are disabled by default.
 
 The current plotting CLI reads root `results/` and writes
 `reports/iteration_plots/` by default. The table module keeps its hardcoded

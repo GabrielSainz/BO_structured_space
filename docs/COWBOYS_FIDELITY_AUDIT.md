@@ -1,5 +1,8 @@
 # COWBOYS fidelity audit
 
+> Historical pre-fix findings. The subsequently authorized corrections and
+> execution evidence are documented in [COWBOYS_IMPLEMENTATION.md](COWBOYS_IMPLEMENTATION.md).
+
 Reviewed 2026-11-17 on `refactor/agent-repo`, local HEAD
 `bf9475c4d554e0a708cb4b8f649832fbfce135d8`. This is an audit; no solver,
 decoder, checkpoint, default, objective, or experiment protocol was changed.

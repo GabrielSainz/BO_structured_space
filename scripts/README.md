@@ -5,12 +5,14 @@ Objective diagnostics are under `scripts/diagnostics/`; see
 
 Run these from the **repository root** after activating the appropriate existing
 environment. Invoke the scripts here directly; redundant root `run*.sh`
-forwarders have been removed. Experiment commands, settings and loops are
-preserved.
+forwarders have been removed. The corrected COWBOYS launcher is described in
+[the implementation notes](../docs/COWBOYS_IMPLEMENTATION.md); other historical
+launchers retain their settings.
 
 | Scripts under `experiments/` | Existing role |
 |---|---|
-| `run.sh`, `run_iterations.sh` | COWBOYS PMO sweeps and iteration metrics |
+| `run.sh` | Corrected single-chain COWBOYS, preflight checks, fresh outputs and paper comparison |
+| `run_iterations.sh` | Historical COWBOYS iteration-metric sweep |
 | `run_flow.sh`, `run_flow_2.sh`, `run_iterations_nf.sh` | Two flow implementations and flow iteration runs |
 | `run_diffusion.sh`, `run_diffusion2.sh`, `run_diffusion_iterations.sh`, `run_diffusion_guidance_sweep.sh` | Diffusion experiments and guidance sweeps |
 | `run_lsbo_poli.sh` | LSBO PMO runs, environment-variable settings and local logs |

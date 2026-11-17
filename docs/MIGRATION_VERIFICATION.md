@@ -2,6 +2,12 @@
 
 > Historical Phase 1 record. The subsequent [cleanup](CLEANUP.md) removed redundant compatibility launchers; see that record for current entry points.
 
+> Subsequent 2026-11-17 verification: a corrected COWBOYS real CPU iteration
+> passed under `conda run -n hdbo_benchmark`. Directly invoking that environment's
+> Python from the base shell still reproduced the historical BLAS error.
+> No dependency or optimizer changes were needed. See
+> [current implementation and evidence](COWBOYS_IMPLEMENTATION.md).
+
 Phase 1, 2026-11-05. Work remains uncommitted on `refactor/agent-repo`.
 
 ## Implemented structural changes

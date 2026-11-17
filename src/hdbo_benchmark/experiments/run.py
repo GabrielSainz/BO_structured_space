@@ -66,6 +66,8 @@ def _build_output_dir(
     sufix: str,
     diffusion_config: dict[str, float | int | str | None],
 ) -> Path:
+    if solver_name == "cowboys":
+        return Path("./results/cowboys") / sufix
     if solver_name != "cowboys_diffusion":
         return Path(f"./results/new_vae_10_chain_100_steps_with_stoch_sampling_{sufix}")
 
@@ -139,6 +141,7 @@ def _save_solver_progress(
     status: str,
     initial_history_size: int,
     save_iteration_results: bool,
+    evaluate_top_candidate_objectives: bool = False,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -168,6 +171,8 @@ def _save_solver_progress(
                 "y": np.asarray(history_y),
                 "best_performance": best_performance,
             }
+            if getattr(solver, "observed_structures", None) is not None:
+                history_payload["structures"] = np.asarray(solver.observed_structures)
 
             if iteration_results_requested:
                 try:
@@ -178,7 +183,9 @@ def _save_solver_progress(
                             history_y=np.asarray(history_y),
                             initial_history_size=initial_history_size,
                             completed_iterations=completed_iterations,
-                            evaluate_top_candidate_objectives=status != "running",
+                            evaluate_top_candidate_objectives=(
+                                evaluate_top_candidate_objectives and status != "running"
+                            ),
                         )
                     )
                     history_payload.update(iteration_series)
@@ -215,6 +222,10 @@ def _save_solver_progress(
         best_value = float(np.nanmax(best_performance))
 
     status_payload = {
+        "solver_name": solver_name,
+        "function_name": function_name,
+        "seed": int(seed),
+        "initial_history_size": int(initial_history_size),
         "status": status,
         "completed_iterations": int(completed_iterations),
         "best_value": best_value,
@@ -223,7 +234,10 @@ def _save_solver_progress(
         "iteration_results_file": (
             iteration_results_path.name if iteration_results_written else None
         ),
+        "diagnostic_objective_evaluations_enabled": evaluate_top_candidate_objectives,
     }
+    if hasattr(solver, "get_run_configuration"):
+        status_payload["solver_configuration"] = solver.get_run_configuration()
     _write_with_retries(
         status_path,
         lambda tmp_path: _write_json(tmp_path, status_payload),
@@ -253,6 +267,7 @@ def _main(
     diffusion_eta: float | None = None,
     save_iteration_results: bool = True,
     checkpoint_every: int = 10,
+    evaluate_top_candidate_objectives: bool = False,
 ):
     checkpoint_every = max(1, int(checkpoint_every))
 
@@ -365,7 +380,8 @@ def _main(
         and hasattr(solver, "set_vae_and_bounds")
     ):
         solver.set_vae_and_bounds(generative_model, bounds)
-        solver.bounds = bounds
+        if solver_name != "cowboys":
+            solver.bounds = bounds
         assert solver._given_vae
         if hasattr(solver, "load_diffusion_model_from_checkpoint"):
             checkpoint_path = (
@@ -413,6 +429,7 @@ def _main(
                         status="running",
                         initial_history_size=initial_history_size,
                         save_iteration_results=save_iteration_results,
+                        evaluate_top_candidate_objectives=evaluate_top_candidate_objectives,
                     )
         else:
             solver.solve(max_iter=max_iter)
@@ -450,6 +467,7 @@ def _main(
             status=final_status,
             initial_history_size=initial_history_size,
             save_iteration_results=save_iteration_results,
+            evaluate_top_candidate_objectives=evaluate_top_candidate_objectives,
         )
 
     if run_error is not None:
@@ -490,6 +508,11 @@ def _main(
     default=True,
 )
 @click.option("--checkpoint-every", type=int, default=10)
+@click.option(
+    "--evaluate-top-candidate-objectives/--no-evaluate-top-candidate-objectives",
+    default=False,
+    help="Opt into extra post-run oracle calls outside the BO budget.",
+)
 def main(
     function_name: str,
     solver_name: str,
@@ -512,6 +535,7 @@ def main(
     diffusion_eta: float | None,
     save_iteration_results: bool,
     checkpoint_every: int,
+    evaluate_top_candidate_objectives: bool,
 ):
     _main(
         function_name,
@@ -535,6 +559,7 @@ def main(
         diffusion_eta,
         save_iteration_results,
         checkpoint_every,
+        evaluate_top_candidate_objectives,
     )
 
 

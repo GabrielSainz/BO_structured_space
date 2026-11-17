@@ -222,6 +222,10 @@ def transform_problem_from_discrete_to_continuous(
         new_data_package = DataPackage(
             unsupervised_data=new_unsupervised_data, supervised_data=(z, y_)
         )
+        if isinstance(generative_model, (VAE, OptimizedVAE)):
+            # COWBOYS' structural GP needs the molecules that produced y_, not
+            # potentially lossy reconstructions of their encoder means.
+            continuous_f.initial_observed_structures = np.array(x_, copy=True)
     else:
         new_data_package = problem.data_package
 

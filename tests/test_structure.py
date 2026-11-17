@@ -44,7 +44,10 @@ assert not {'torch', 'poli', 'botorch', 'matplotlib'} & sys.modules.keys()
         self.assertTrue(scripts)
         for script in scripts:
             with self.subTest(script=script.name):
-                self.assertIn("python run.py", script.read_text(encoding="utf-8"))
+                self.assertRegex(
+                    script.read_text(encoding="utf-8"),
+                    r'(?:python|"\$PYTHON_BIN") run\.py',
+                )
 
 
 if __name__ == "__main__":

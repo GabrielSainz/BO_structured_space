@@ -2,7 +2,7 @@
 This module provides functionality to run COWBOYS
 """
 
-from typing import Any, Tuple, Type
+from typing import Any
 
 import numpy as np
 import torch
@@ -13,13 +13,15 @@ from poli.core.abstract_black_box import AbstractBlackBox
 from hdbo_benchmark.generative_models.vae_factory import VAE
 from botorch.acquisition.analytic import LogProbabilityOfImprovement
 from botorch.acquisition import qLogExpectedImprovement
-from botorch.optim import optimize_acqf_discrete
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 import selfies as sf
 from gauche.kernels.fingerprint_kernels import TanimotoKernel
 from gpytorch.kernels import ScaleKernel
-from hdbo_benchmark.utils.experiments.normalization import from_unit_cube_to_range
+from hdbo_benchmark.utils.experiments.normalization import (
+    from_range_to_unit_cube,
+    from_unit_cube_to_range,
+)
 from hdbo_benchmark.utils.logging.candidate_diagnostics import (
     TOP_K_CANDIDATES,
     build_top_candidate_diagnostics,
@@ -41,9 +43,11 @@ from poli_baselines.solvers.bayesian_optimization.base_bayesian_optimization.bas
 
 
 class COWBOYS(BaseBayesianOptimization):
-    """
-    TODO
+    """Molecular COWBOYS: structure-space GP and raw-latent pCN.
 
+    History/returned candidates use normalized coordinates for the poli wrapper.
+    Sampling uses the VAE's unbounded standard-normal latent coordinates.
+    See docs/COWBOYS_IMPLEMENTATION.md for intentional upstream differences.
     """
 
     def __init__(
@@ -53,6 +57,9 @@ class COWBOYS(BaseBayesianOptimization):
         y0: np.ndarray,
         penalize_nans_with: float = -10.0,
         device: torch.device = torch.device("cpu"),
+        num_chains: int = 1,
+        n_steps: int = 100,
+        max_sampling_steps: int = 10_000,
     ):
         """
         Initialize the VanillaBayesianOptimization class.
@@ -74,12 +81,20 @@ class COWBOYS(BaseBayesianOptimization):
         self.device = device
         self._given_vae = False # will be updated once VAE passed in using `set_vae` after init
         self.batch_size = 1 # number of molecules to choose at each iteration
-        self.num_chains = 10 # number of MCMC chains
-        self.n_steps = 100 # minimum number of MCMC steps
+        if num_chains < 1 or n_steps < 1 or max_sampling_steps < n_steps:
+            raise ValueError("Require num_chains >= 1 and max_sampling_steps >= n_steps >= 1")
+        self.num_chains = num_chains
+        self.n_steps = n_steps
+        self.max_sampling_steps = max_sampling_steps
         self.betas = torch.tensor([0.1]).to(dtype=torch.float64, device=self.device)[None,:].repeat(self.num_chains,1) # keep track of beta param for each MCMC chain
         self.iteration_sampling_metrics_history: list[dict[str, int]] = []
         self.iteration_candidate_diagnostics_history: list[dict[str, Any]] = []
         self._seen_sampled_decoded_structures: set[str] = set()
+        initial_structures = getattr(black_box, "initial_observed_structures", None)
+        self.observed_structures = (
+            self._structure_strings(initial_structures)
+            if initial_structures is not None else None
+        )
 
     def _fit_model(
         self, model: SingleTaskGP, x: np.ndarray, y: np.ndarray
@@ -87,7 +102,9 @@ class COWBOYS(BaseBayesianOptimization):
         x = torch.from_numpy(x).to(dtype=torch.float64, device=self.device)
         y = torch.from_numpy(y).to(dtype=torch.float64, device=self.device)
 
-        with gpytorch.settings.fast_computations(covar_root_decomposition=False, log_prob=False, solves=False) and gpytorch.settings.fast_pred_var(state=False):
+        with gpytorch.settings.fast_computations(
+            covar_root_decomposition=False, log_prob=False, solves=False
+        ), gpytorch.settings.fast_pred_var(state=False):
             model_instance = model(
                 x,
                 y,
@@ -101,135 +118,170 @@ class COWBOYS(BaseBayesianOptimization):
         self.gp_model_of_objective = model_instance
         return model_instance
 
-    def next_candidate(self) -> np.ndarray:
-        """Runs one loop of COWBOYS.
+    @staticmethod
+    def _structure_strings(structures: np.ndarray) -> list[str]:
+        return ["".join(np.asarray(row).reshape(-1).tolist()) for row in structures]
 
-        Returns
-        -------
-        candidate : np.ndarray
-            The next candidate(s) to evaluate.
+    def _unit_to_latent(self, values: np.ndarray) -> np.ndarray:
+        return from_unit_cube_to_range(values, self.vae_bounds)
 
-        Notes
-        -----
-        We penalize the NaNs in the objective function by
-        assigning them a value stored in self.penalize_nans_with.
+    def _latent_to_unit(self, values: np.ndarray) -> np.ndarray:
+        return from_range_to_unit_cube(values, self.vae_bounds)
+
+    def set_vae_and_bounds(
+        self, vae: VAE, vae_bounds: tuple[float, float],
+        initial_structures: np.ndarray | None = None,
+    ) -> None:
+        """Attach the decoder and the original, actually evaluated structures.
+
+        The molecular problem wrapper supplies initial structures automatically.
+        Direct users must supply them here; reconstructions cannot replace them.
         """
-        
-        
+        if not np.isfinite(vae_bounds).all() or vae_bounds[1] <= vae_bounds[0]:
+            raise ValueError("VAE bounds must be finite and increasing")
+        structures = (self._structure_strings(initial_structures)
+                      if initial_structures is not None else self.observed_structures)
+        x, _ = self.get_history_as_arrays()
+        if structures is None or len(structures) != len(x):
+            raise ValueError("Pass the original evaluated initial_structures, aligned with x0/y0")
+        if any(self._canonical_smiles(s) is None for s in structures):
+            raise ValueError("Initial observed structures must be valid nonempty molecules")
+        self.vae = vae
+        self.vae.eval()
+        self.vae_bounds = tuple(vae_bounds)
+        self.bounds = (0.0, 1.0)
+        self.observed_structures = list(structures)
+        self._given_vae = True
+
+    def get_run_configuration(self) -> dict[str, Any]:
+        return {
+            "implementation": "cowboys_corrected_pcn_v1",
+            "latent_sampling_coordinates": "raw_vae_standard_normal",
+            "history_coordinates": "normalized",
+            "gp_observations": "actual_evaluated_structures",
+            "novelty": "canonical_smiles",
+            "threshold_policy": "fixed_incumbent",
+            "batch_size": self.batch_size,
+            "latent_dim": self.vae.latent_dim,
+            "num_chains": self.num_chains,
+            "n_steps": self.n_steps,
+            "max_sampling_steps": self.max_sampling_steps,
+            "beta_adaptation": "upstream_diminishing_log_beta_target_0.234",
+            "vae_bounds": list(self.vae_bounds),
+            "vae_checkpoint": getattr(self.vae, "checkpoint_path", None),
+            "vae_checkpoint_sha256": getattr(self.vae, "checkpoint_sha256", None),
+        }
+
+    def update(self, x: np.ndarray, y: np.ndarray) -> None:
+        """Keep actual decoded observations aligned with the base solver history."""
+        structures = self._structure_strings(
+            self.vae.decode_to_string_array(self._unit_to_latent(np.asarray(x)))
+        )
+        if len(structures) != len(x):
+            raise ValueError("Decoder returned a different number of structures")
+        super().update(x, y)
+        self.observed_structures.extend(structures)
+
+    def next_candidate(self) -> np.ndarray:
+        """Sample PI-weighted raw latents and select a new molecule using log-EI."""
         if not self._given_vae:
-            raise ValueError("need to pass in VAE to solver using its `set_vae` method")
-        
-        def latent_array_to_selfies_list(z: np.ndarray) -> list:
-            # helper function to convert latent array to selfies strings via the VAE decoder
-            z = from_unit_cube_to_range(z, self.bounds)
-            selfies_strings = self.vae.decode_to_string_array(z)
-            return selfies_strings.tolist()
-
-
-        # Build up the history
+            raise ValueError("Pass the VAE and original observations using set_vae_and_bounds")
+        if self.batch_size != 1:
+            raise ValueError("This baseline implements the paper's batch_size=1 protocol")
         x, y = self.get_history_as_arrays()
-        print(f"collected at {len(x)} points so far, with best score so far as {y.max()}") 
-        prev_selfies = latent_array_to_selfies_list(x)
-        prev_fingerprints = self.selfies_list_to_fingerprint_tensors(prev_selfies).cpu().numpy()
-
-        # Penalize NaNs
+        if len(self.observed_structures) != len(x):
+            raise ValueError("Observed structures and objective history are misaligned")
+        y = np.asarray(y, dtype=float).copy()
         y[np.isnan(y)] = self.penalize_nans_with
+        if not np.isfinite(y).all():
+            raise ValueError("Objective history contains infinite values")
+        previous = list(self.observed_structures)
+        observed_molecules = {self._canonical_smiles(s) for s in previous}
+        features = self.selfies_list_to_fingerprint_tensors(previous)
+        model = self._fit_model(SingleTaskGP, features.cpu().numpy(), y)
+        best_so_far = torch.as_tensor(y.max(), dtype=torch.float64, device=self.device)
+        log_pi = LogProbabilityOfImprovement(model, best_f=best_so_far)
 
-        # Fit a GP
-        model = self._fit_model(SingleTaskGP, prev_fingerprints, y)
-
+        def log_likelihood(raw_latents):
+            structures = self._structure_strings(
+                self.vae.decode_to_string_array(raw_latents.cpu().numpy())
+            )
+            valid = [i for i, s in enumerate(structures) if self._canonical_smiles(s) is not None]
+            values = torch.full((len(structures),), -torch.inf,
+                                dtype=torch.float64, device=self.device)
+            if valid:
+                fp = self.selfies_list_to_fingerprint_tensors([structures[i] for i in valid])
+                values[valid] = log_pi(fp[:, None, :]).reshape(-1)
+            return values, structures
 
         with torch.no_grad():
-            best_so_far = torch.tensor(y).to(torch.float64).max() # starting location for MCMC chains
-            log_prob_improvement = LogProbabilityOfImprovement(model, best_f=best_so_far)
-            counter = 0 
-
-
-            def log_lik(s):  # eval log likelihood from GP
-                x_selfies = latent_array_to_selfies_list(s.cpu().numpy())
-                x_fingerprints = self.selfies_list_to_fingerprint_tensors(x_selfies)
-                return log_prob_improvement(x_fingerprints[:,None,:]), x_selfies
-
-
-            # initialise everything ready for MCMC
-            s_currents = torch.tensor(x[y.argmax(), :][None, :]).to(dtype=torch.float64, device=self.device).repeat(self.num_chains, 1) # [C, d]
-            log_lik_currents, _= log_lik(s_currents)
-            s_samples = torch.zeros((0,self.vae.latent_dim)).to(device=self.device)
-            selfies_samples =[]
-   
-
-            while True:
-                if counter>0 and counter%self.n_steps==0:
-                    #if still looking for a new point, reduce the temperature (NOTE THAT THIS IS NEVER ACTUALLY TRIGGERED IN PRACTICE)
-                    best_so_far *= 0.95
-                    log_prob_improvement = LogProbabilityOfImprovement(model, best_f=best_so_far)
-                
-        
-                # perfom CN MCMC for each chain in parallel
-                nu = torch.randn((self.num_chains,self.vae.latent_dim)).to(device=self.device).to(dtype=torch.float64)
-                s_candidates = torch.sqrt(1-self.betas**2)*s_currents + self.betas*nu
-                log_lik_candidate, selfies_candidates = log_lik(
-                    s_candidates
-                )
-                log_acceptance_prob = log_lik_candidate - log_lik_currents
-                log_acceptance_prob =  torch.clip(log_acceptance_prob, -100000000, 0)
-                accept = log_acceptance_prob > torch.log(torch.rand(self.num_chains).to(device=self.device))
-                if torch.sum(accept)>0: # if any chains accepted, update thhose chains
-                    accepted_idx = torch.where(accept)[0]
-                    s_currents[accepted_idx] = s_candidates[accepted_idx]
-                    log_lik_currents[accepted_idx] = log_lik_candidate[accepted_idx]
-                    selfies_samples = selfies_samples + [selfies_candidates[i] for i in accepted_idx]
-                    s_samples = torch.vstack([s_samples, s_candidates[accepted_idx]])
-
-
-                # do adaptive MCMC on the CN's Beta param
-                target_acceptance_prob = 0.234
-                log_betas = torch.log(self.betas) + 0.5*(torch.pow(counter+1,torch.tensor([-0.6], dtype=torch.float64).to(device=self.device)))*(torch.exp(log_acceptance_prob) - target_acceptance_prob)[:,None]
-                self.betas = torch.clip(torch.exp(log_betas),0.000001,1.0)
-
-                counter+=1
-                # keep track of the unique samples found so far
-                unique_new_structures = list(set(selfies_samples).difference(set(prev_selfies)))
-                unique_idx = [selfies_samples.index(x) for x in unique_new_structures]
-                if counter>=self.n_steps and len(unique_idx)>=self.batch_size:
-                    # end the loop if we have done enough steps and found enough unique samples
+            # x is normalized, but the VAE prior and pCN proposal are in raw z.
+            start = self._unit_to_latent(x[int(y.argmax())][None, :])
+            currents = torch.as_tensor(start, dtype=torch.float64, device=self.device).repeat(self.num_chains, 1)
+            current_log_pi, _ = log_likelihood(currents)
+            sampled_structures = []
+            eligible: dict[str, tuple[torch.Tensor, str]] = {}
+            for counter in range(self.max_sampling_steps):
+                noise = torch.randn(currents.shape, dtype=torch.float64, device=self.device)
+                proposals = torch.sqrt(1 - self.betas.square()) * currents + self.betas * noise
+                proposal_log_pi, structures = log_likelihood(proposals)
+                # Gaussian prior cancels against the pCN Hastings proposal ratio.
+                log_alpha = torch.nan_to_num(proposal_log_pi - current_log_pi,
+                                            nan=-torch.inf, posinf=0.0, neginf=-torch.inf).clamp(max=0)
+                accept = log_alpha > torch.log(torch.rand(self.num_chains, dtype=torch.float64, device=self.device))
+                for i in torch.where(accept)[0].tolist():
+                    currents[i] = proposals[i]
+                    current_log_pi[i] = proposal_log_pi[i]
+                    structure = structures[i]
+                    canonical = self._canonical_smiles(structure)
+                    if canonical is None:
+                        continue
+                    sampled_structures.append(structure)
+                    if canonical not in observed_molecules and canonical not in eligible:
+                        eligible[canonical] = (proposals[i].clone(), structure)
+                # Retain the released implementation's diminishing log-beta rule.
+                log_betas = (torch.log(self.betas)
+                             + 0.5 * (counter + 1) ** (-0.6)
+                             * (log_alpha.exp() - 0.234)[:, None])
+                self.betas = log_betas.exp().clamp(1e-6, 1.0)
+                if counter + 1 >= self.n_steps and len(eligible) >= self.batch_size:
                     break
-            print(f"did {counter} steps and found {len(unique_idx)} unique")
+            else:
+                raise RuntimeError(
+                    f"COWBOYS found no new valid molecule after {self.max_sampling_steps} "
+                    "pCN steps; threshold was kept fixed. Increase max_sampling_steps explicitly."
+                )
             self._record_sampling_metrics(
-                sampled_structures=selfies_samples,
-                unique_structures_not_in_observed_history=unique_new_structures,
+                sampled_structures, [entry[1] for entry in eligible.values()]
             )
-
-
-        # filter the unique samples found so far if there are more than than desired using EI heuristic
-        fingerprints_samples =  self.selfies_list_to_fingerprint_tensors(selfies_samples)
-        acq = qLogExpectedImprovement(model, best_f=best_so_far)
-        fingerprints_chosen_for_model, _ = optimize_acqf_discrete(acq, min(self.batch_size, len(selfies_samples)), fingerprints_samples, max_batch_size=1_000)
-        chosen_idx = [fingerprints_samples.tolist().index(x) for x in fingerprints_chosen_for_model.tolist()]
-        ranked_diagnostic_candidates = self._build_ranked_diagnostic_candidates(
-            candidate_latents=s_samples,
-            candidate_structures=selfies_samples,
-            candidate_features=fingerprints_samples,
-            acquisition=acq,
-            observed_structures=prev_selfies,
-        )
-        self._record_top_candidate_diagnostics(ranked_diagnostic_candidates)
-        return s_samples[chosen_idx].cpu().numpy()
-
-
-
-    def set_vae_and_bounds(self, vae: VAE, vae_bounds: tuple[float, float]):
-        self.vae = vae
-        self.vae_bounds = vae_bounds
-        self._given_vae = True
+            candidate_latents = torch.stack([entry[0] for entry in eligible.values()])
+            candidate_structures = [entry[1] for entry in eligible.values()]
+            candidate_features = self.selfies_list_to_fingerprint_tensors(candidate_structures)
+            acq = qLogExpectedImprovement(model, best_f=best_so_far)
+            # Select indices directly: fingerprint equality does not identify a molecule.
+            scores = torch.cat([
+                acq(chunk[:, None, :]).reshape(-1)
+                for chunk in candidate_features.split(1000)
+            ])
+            if not torch.isfinite(scores).any():
+                raise RuntimeError("All candidate EI values are nonfinite")
+            scores = torch.where(torch.isfinite(scores), scores, -torch.inf)
+            chosen = int(scores.argmax())
+            unit_latents = self._latent_to_unit(candidate_latents.cpu().numpy())
+            ranked = self._build_ranked_diagnostic_candidates(
+                torch.as_tensor(unit_latents, dtype=torch.float64, device=self.device),
+                candidate_structures, candidate_features, acq, previous,
+            )
+            self._record_top_candidate_diagnostics(ranked)
+        return unit_latents[chosen:chosen + 1]
 
 
     def selfies_list_to_fingerprint_tensors(self, selfies: list):
 
         smiles_list = [sf.decoder(s) for s in selfies]
         mols = [Chem.MolFromSmiles(s) for s in smiles_list]
-        mols = [m if m is not None else Chem.MolFromSmiles('Cc1ccccc1') for m in mols]
-        assert None not in mols, "Invalid SMILES found"
+        if any(m is None or m.GetNumAtoms() == 0 for m in mols):
+            raise ValueError("Cannot fingerprint an invalid or empty observed molecule")
 
         # convert mols into Morgan fingerprints
         fp_dicts = []
@@ -327,7 +379,7 @@ class COWBOYS(BaseBayesianOptimization):
 
     def _canonical_smiles(self, structure: str) -> str | None:
         mol = self._selfies_to_mol(structure)
-        if mol is None:
+        if mol is None or mol.GetNumAtoms() == 0:
             return None
         return Chem.MolToSmiles(mol, canonical=True)
 
@@ -336,7 +388,10 @@ class COWBOYS(BaseBayesianOptimization):
         sampled_structures: list[str],
         unique_structures_not_in_observed_history: list[str],
     ) -> None:
-        unique_sampled_structures = list(dict.fromkeys(sampled_structures))
+        unique_sampled_structures = list(dict.fromkeys(
+            self._canonical_smiles(s) for s in sampled_structures
+            if self._canonical_smiles(s) is not None
+        ))
         new_distinct_sampled_structures = [
             structure
             for structure in unique_sampled_structures

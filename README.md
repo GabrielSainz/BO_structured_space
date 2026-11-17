@@ -52,7 +52,9 @@ python -c "from tdc import Oracle; print('tdc ok')"
 These are retained setup instructions, not a newly validated dependency lock.
 The build system declares `setuptools<=68`; a local no-isolation build with
 setuptools 80.10.2 failed with the original and migrated metadata. The available
-Windows research environment also fails during COWBOYS GP fitting. See
+Windows Phase 1 invocation also failed during COWBOYS GP fitting. A subsequent
+real one-step check passed under proper Conda activation; see the
+[corrected COWBOYS setup](docs/COWBOYS_IMPLEMENTATION.md). See
 [verification and limits](docs/MIGRATION_VERIFICATION.md) before interpreting
 these commands as a verified clean installation or successful experiment.
 Colab remains experimental because of chemistry/TDC and model-stack dependencies.
@@ -93,7 +95,11 @@ python run.py --function-name albuterol_similarity --solver-name cowboys --n-dim
 ```
 
 It loads an existing molecular VAE checkpoint; it is not a lightweight check.
-Full sweeps run through `bash scripts/experiments/run.sh`. Flow, diffusion and LSBO launchers are described
+The corrected baseline and automatic paper comparison run through
+`bash scripts/experiments/run.sh` in the activated environment. Its preflight,
+fresh output directories and remaining classifier limitations are explained in
+[COWBOYS_IMPLEMENTATION.md](docs/COWBOYS_IMPLEMENTATION.md).
+Flow, diffusion and LSBO launchers are described
 in [scripts/README.md](scripts/README.md). Use Git Bash/WSL on Windows for shell
 scripts. Inspect budgets before launching sweeps. SLURM batch files are under `scripts/slurm/`; submit them from the repository
 root. Historical package experiment entry points retain their locations.

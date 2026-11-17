@@ -11,7 +11,8 @@ duplicating settings or changing relative paths.
 | Optional solver environments | [`../envs/`](../envs/) | YAML pip entries use `..[extra]`; run from `envs/` |
 | Package dependencies and extras | [`../pyproject.toml`](../pyproject.toml), [`../setup.cfg`](../setup.cfg) | Root; existing dependency versions preserved |
 | Additional requirements | [`../requirements.txt`](../requirements.txt), [`../requirements-dev.txt`](../requirements-dev.txt) | Root; overlaps with metadata remain technical debt |
-| Current experiment settings | [`../scripts/experiments/`](../scripts/experiments/) | Root; shell flags, seed loops, diffusion settings and budgets unchanged |
+| Current experiment settings | [`../scripts/experiments/`](../scripts/experiments/) | `run.sh` uses the corrected COWBOYS setup; other historical launchers retain their settings |
+| COWBOYS paper reference | [`cowboys_paper_table1.json`](cowboys_paper_table1.json) | Table 1 task list, reported values, protocol and verified checkpoint digest; see [implementation notes](../docs/COWBOYS_IMPLEMENTATION.md) |
 | Scheduler settings | [`../scripts/slurm/`](../scripts/slurm/) | Submit from the repository root; original SLURM headers and arguments preserved |
 | CLI defaults | [`../src/hdbo_benchmark/experiments/run.py`](../src/hdbo_benchmark/experiments/run.py) | Click options and `_main`; retain the existing `--sufix` spelling |
 | Method defaults | [`../src/hdbo_benchmark/solvers/`](../src/hdbo_benchmark/solvers/) | Constructor defaults and `registry.py`; no extraction to config files |
