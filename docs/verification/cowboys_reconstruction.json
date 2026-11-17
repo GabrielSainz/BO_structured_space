@@ -1,0 +1,84 @@
+{
+  "seed": 1,
+  "n": 10,
+  "same_canonical_count": 7,
+  "molecules": [
+    {
+      "index": 0,
+      "original": "Cc1cc(NC(=O)CSc2nnc(Cc3cccs3)n2C2CC2)no1",
+      "reconstructed": "Cc1cc(NC(=O)CSc2nnc(Cc3cccs3)n2C2CC2)no1",
+      "same_canonical_molecule": true,
+      "same_folded_gp_fingerprint": true
+    },
+    {
+      "index": 1,
+      "original": "O=C(NNc1ncnc(N2CCN(c3ccccc3F)CC2)c1[N+](=O)[O-])c1ccccc1F",
+      "reconstructed": "O=C(NNc1ncnc(N2CCN(c3ccccc3F)CC2)c1[N+](=O)[O-])c1ccccc1F",
+      "same_canonical_molecule": true,
+      "same_folded_gp_fingerprint": true
+    },
+    {
+      "index": 2,
+      "original": "COc1ccc(Nc2ncnc(NCc3ccc(F)cc3)c2N)cc1",
+      "reconstructed": "COc1ccc(Nc2ncnc(NCc3ccc(F)cc3)c2N)cc1",
+      "same_canonical_molecule": true,
+      "same_folded_gp_fingerprint": true
+    },
+    {
+      "index": 3,
+      "original": "C[C@H]1CCC[C@@H]2CCCN(C(=O)C[C@H]3C=CCC3)[C@@H]21",
+      "reconstructed": "C[C@H]1CCC[NH+]2CCCN(C(=O)C3[CH]C=CCC3)C12",
+      "same_canonical_molecule": false,
+      "same_folded_gp_fingerprint": false
+    },
+    {
+      "index": 4,
+      "original": "CC(C)C[C@H](C)NC(=O)c1ccccc1Br",
+      "reconstructed": "CC(C)C[C@H](C)NC(=O)c1ccccc1Br",
+      "same_canonical_molecule": true,
+      "same_folded_gp_fingerprint": true
+    },
+    {
+      "index": 5,
+      "original": "CC(=O)c1cc2cc(C)ccc2nc1Cl",
+      "reconstructed": "CC(=O)c1cc2cc(Cl)ccc2nc1Cl",
+      "same_canonical_molecule": false,
+      "same_folded_gp_fingerprint": false
+    },
+    {
+      "index": 6,
+      "original": "COc1ccc(Cl)cc1S(=O)(=O)N[C@H](C)C(=O)NCc1ccc2c(c1)OCO2",
+      "reconstructed": "COc1ccc(Cl)cc1S(=O)(=O)N[C@H](C)C(=O)NCc1ccc2c(c1)OCO2",
+      "same_canonical_molecule": true,
+      "same_folded_gp_fingerprint": true
+    },
+    {
+      "index": 7,
+      "original": "Cc1cc(C)c(C(=O)OCC(=O)N(C)c2ccccc2)c(C)c1",
+      "reconstructed": "Cc1cc(C)c(C(=O)OCC(=O)N(C)c2ccccc2)c(C)c1",
+      "same_canonical_molecule": true,
+      "same_folded_gp_fingerprint": true
+    },
+    {
+      "index": 8,
+      "original": "Cc1ccc(C(=O)N2CCC[C@@H]3CCC[C@H]32)c(NN)c1",
+      "reconstructed": "CC1=CC=C(C(=O)N2CCC[C@@H]3CCC[C@H]32)C=CN=C1",
+      "same_canonical_molecule": false,
+      "same_folded_gp_fingerprint": false
+    },
+    {
+      "index": 9,
+      "original": "O=C(NCc1ccc(-n2cccn2)cc1)c1n[nH]c(=O)[nH]1",
+      "reconstructed": "O=C(NCc1ccc(-n2cccn2)cc1)c1n[nH]c(=O)[nH]1",
+      "same_canonical_molecule": true,
+      "same_folded_gp_fingerprint": true
+    }
+  ],
+  "baseline_latents_match": false,
+  "baseline_latents_max_abs_difference": 0.30109041929244995,
+  "baseline_latents_allclose_atol_1e-6": false,
+  "audit_date": "2026-11-17",
+  "scope": "Current default CPU VAE, cached poli seed-1 sample of ten molecules; no objective evaluations",
+  "checkpoint_git_blob_sha1": "ab3522fcb2cb1aae773a7925c1fada9c5eb8bd43",
+  "historical_comparison_note": "Current encoded latents differ from Phase 1 saved latents. This is not a historical-run reconstruction reproduction."
+}

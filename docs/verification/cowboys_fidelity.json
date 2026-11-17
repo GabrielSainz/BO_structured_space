@@ -1,0 +1,134 @@
+{
+  "unchanged_method_ast": {
+    "_fit_model": true,
+    "set_vae_and_bounds": true,
+    "selfies_list_to_fingerprint_tensors": true
+  },
+  "vae_class_methods_ast_identical": true,
+  "next_candidate_ast_identical_after_removing_diagnostics": true,
+  "novelty_selection": {
+    "chosen": [
+      [
+        0.49749371855331
+      ]
+    ],
+    "choice_features": [
+      10.0,
+      1.0
+    ],
+    "likelihood_threshold_calls": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "unclipped_log_acceptance": [
+      0.0,
+      0.0
+    ],
+    "new_structure_count": 1,
+    "rng_tail": [
+      0.9486057779931771,
+      0.9469626038148141,
+      0.3466947431127473
+    ]
+  },
+  "diagnostics_preserve_rng_and_candidate_in_probe": true,
+  "threshold_cache": {
+    "chosen": [
+      [
+        0.49749371855331
+      ]
+    ],
+    "choice_features": [
+      10.0,
+      10.0,
+      1.0
+    ],
+    "likelihood_threshold_calls": [
+      1.0,
+      1.0,
+      1.0,
+      0.95
+    ],
+    "unclipped_log_acceptance": [
+      0.0,
+      0.0,
+      0.10000000000000009
+    ],
+    "new_structure_count": 1,
+    "rng_tail": [
+      0.9486057779931771,
+      0.9469626038148141,
+      0.7009031495636394
+    ]
+  },
+  "lossy_initial_history": {
+    "original_structure": "[C]",
+    "reconstructed_structure": "[O]",
+    "stored_y_of_original": 1.0
+  },
+  "setter_bounds": {
+    "base_default": [
+      -2.0,
+      2.0
+    ],
+    "vae_bounds": [
+      -10.0,
+      10.0
+    ]
+  },
+  "coordinate_prior": {
+    "unit_prior_mean": 0.0,
+    "unit_prior_variance": 1.0,
+    "implied_raw_prior_mean": -10.0,
+    "implied_raw_prior_variance": 400.0,
+    "correct_unit_prior_mean": 0.5,
+    "correct_unit_prior_variance": 0.0025,
+    "first_proposal_raw_mean_at_z_zero": -0.05012562893380057,
+    "first_proposal_raw_std": 2.0,
+    "paper_first_proposal_raw_std": 0.1
+  },
+  "posthoc_diagnostics": {
+    "real_toy_evaluations": 1,
+    "restored_counter": 0
+  },
+  "checkpoint_hashes": [
+    {
+      "path": "data/trained_models/training_vae_on_zinc_250k/latent_dim-128-batch_size-512-lr-0.0005-seed-1.pt",
+      "git_blob_sha1": "ab3522fcb2cb1aae773a7925c1fada9c5eb8bd43",
+      "size": 92838066,
+      "matches_upstream_blob": true
+    },
+    {
+      "path": "src/hdbo_benchmark/assets/training_vae_on_zinc_250k/latent_dim-128-batch_size-512-lr-0.0005-seed-1.pt",
+      "git_blob_sha1": "ab3522fcb2cb1aae773a7925c1fada9c5eb8bd43",
+      "size": 92838066,
+      "matches_upstream_blob": true
+    }
+  ],
+  "upstream_commit": "6bac4e48f3f345de6727d8d3b8b8162b443a212e",
+  "local_head": "bf9475c4d554e0a708cb4b8f649832fbfce135d8",
+  "python": "3.10.20 | packaged by Anaconda, Inc. | (main, Mar 11 2026, 17:42:35) [MSC v.1942 64 bit (AMD64)]",
+  "torch": "2.10.0+cpu",
+  "audit_date": "2026-11-17",
+  "scope": "Source comparison and bounded CPU probes; no GP fitting or real objective calls",
+  "structural_tests": {
+    "command": "python -m unittest tests.test_structure -v",
+    "tests_run": 3,
+    "passed": true
+  },
+  "local_source_sha256": {
+    "src/hdbo_benchmark/solvers/cowboys.py": "4405ca1349df13d7e5cb1f6ce919d641c66be8834d1020145d3501696ad36b99",
+    "src/hdbo_benchmark/experiments/run.py": "844b70804d9c96768a27323b044640c706d4e6a5eba30131da9bfcda1d4f0328",
+    "src/hdbo_benchmark/benchmarks/problem_transformations.py": "0aa495dfe018a9fe1135ef2ca23ec622494e7eec9b5e56b7b4d2b248734b74d8",
+    "src/hdbo_benchmark/benchmarks/load_problems.py": "6bbd384412cbad1372baffd25d05f6e715ea97814085d26c422178a0b31ef4d5",
+    "src/hdbo_benchmark/generative_models/vae_selfies.py": "fec9bde71f16288f1d8656ce768a8f028fca95a2c5df96c651943195904bde84",
+    "src/hdbo_benchmark/generative_models/vae_factory.py": "092b6565f02d6041052d4781c32b07a0bbab0216d1c715669348fd853f06c995",
+    "src/hdbo_benchmark/utils/logging/iteration_metrics.py": "75e752965e3f793125c3f2b2a28569ca342586f3200cefc6de85d32de56ab44c",
+    "src/hdbo_benchmark/utils/logging/candidate_diagnostics.py": "227fef162ed40d495dbe765c0932989cbcbe57c17cb1eed3c11f3fd2ae69680b"
+  },
+  "upstream_source_blobs": {
+    "cowboys.py": "df049b22e3f22a1914363b2abfade5715405d398",
+    "src/hdbo_benchmark/generative_models/vae_selfies.py": "351525c9f7dbff5c9d270174df9c82c5587b0ff6"
+  }
+}
