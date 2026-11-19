@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-17",
+  "python_environment": "hdbo_benchmark Python 3.10",
+  "planned_budget_evidence": "Existing corrected COWBOYS one-step verification artifacts; docs/COWBOYS_IMPLEMENTATION.md",
+  "exported_runs": [
+    {
+      "run_id": "b19cf3973de90d0e6269",
+      "path": "C:\\Users\\gabri\\OneDrive - University of Copenhagen\\Escritorio\\university_of_copenhagen\\ku\\block_6\\project_outside_the_course_scope\\experiments\\ROTLSC\\results\\cowboys\\verification_conda_pcn_20261117T090618\\metrics\\cowboys_albuterol_similarity_1\\run.json",
+      "status": "completed"
+    },
+    {
+      "run_id": "6a34fae7409c6e1e6d86",
+      "path": "C:\\Users\\gabri\\OneDrive - University of Copenhagen\\Escritorio\\university_of_copenhagen\\ku\\block_6\\project_outside_the_course_scope\\experiments\\ROTLSC\\results\\cowboys\\verification_corrected_pcn_20261117T090506\\metrics\\cowboys_albuterol_similarity_1\\run.json",
+      "status": "partial"
+    },
+    {
+      "run_id": "346ecb30feb49ec0d58d",
+      "path": "C:\\Users\\gabri\\OneDrive - University of Copenhagen\\Escritorio\\university_of_copenhagen\\ku\\block_6\\project_outside_the_course_scope\\experiments\\ROTLSC\\results\\cowboys\\verification_script_pcn_20261117T090734\\metrics\\cowboys_albuterol_similarity_1\\run.json",
+      "status": "completed"
+    }
+  ],
+  "input_sha256": {
+    "results\\cowboys\\verification_conda_pcn_20261117T090618\\cowboys_albuterol_similarity_1.npy": "c7accf647748d82ab362f52cf0dd331d3418566bafa06899802d73fab055e27e",
+    "results\\cowboys\\verification_conda_pcn_20261117T090618\\cowboys_albuterol_similarity_1_history.npz": "5bc4b582bc62adf1f3faa6074542107152bbf70bb06582153bc0cf7459448e31",
+    "results\\cowboys\\verification_conda_pcn_20261117T090618\\cowboys_albuterol_similarity_1_iteration_results.json": "4e01d82cd08c31b331d4e6ac76b4f1d5d92b9d7f25519aed7302715d52b44047",
+    "results\\cowboys\\verification_conda_pcn_20261117T090618\\cowboys_albuterol_similarity_1_status.json": "01d06c7ebb9093441b219c3574822536a58e97e2cbe8847a6004e71e4c5c6c25",
+    "results\\cowboys\\verification_corrected_pcn_20261117T090506\\cowboys_albuterol_similarity_1.npy": "c7accf647748d82ab362f52cf0dd331d3418566bafa06899802d73fab055e27e",
+    "results\\cowboys\\verification_corrected_pcn_20261117T090506\\cowboys_albuterol_similarity_1_history.npz": "f87f364bf60ca904840c5c24b1293d0234af327b67c9cb29de7ca59842f2db13",
+    "results\\cowboys\\verification_corrected_pcn_20261117T090506\\cowboys_albuterol_similarity_1_status.json": "19b0b3982d3cf0d9b59e3d24b939b326d1078c8b600dac23b5f2ab1313bb2c72",
+    "results\\cowboys\\verification_script_pcn_20261117T090734\\albuterol_similarity_1.log": "0ac9863445d44e8ec93487d70bd372d348b3bb5c817593debfe96c8416e1ee7b",
+    "results\\cowboys\\verification_script_pcn_20261117T090734\\cowboys_albuterol_similarity_1.npy": "c7accf647748d82ab362f52cf0dd331d3418566bafa06899802d73fab055e27e",
+    "results\\cowboys\\verification_script_pcn_20261117T090734\\cowboys_albuterol_similarity_1_history.npz": "5bc4b582bc62adf1f3faa6074542107152bbf70bb06582153bc0cf7459448e31",
+    "results\\cowboys\\verification_script_pcn_20261117T090734\\cowboys_albuterol_similarity_1_iteration_results.json": "4e01d82cd08c31b331d4e6ac76b4f1d5d92b9d7f25519aed7302715d52b44047",
+    "results\\cowboys\\verification_script_pcn_20261117T090734\\cowboys_albuterol_similarity_1_status.json": "01d06c7ebb9093441b219c3574822536a58e97e2cbe8847a6004e71e4c5c6c25",
+    "results\\cowboys\\verification_script_pcn_20261117T090734\\paper_comparison.csv": "e386726487be04edbf2ce8f0d2e5baa8d004ea433ad10ffe34731046b87584b3",
+    "results\\cowboys\\verification_script_pcn_20261117T090734\\paper_comparison.json": "f0c38286176b54dbad1a4d3afd64fdc574262dfd074e26b17011f11e0a2911c9",
+    "results\\cowboys\\verification_script_pcn_20261117T090734\\sweep_status.tsv": "10267c2996a9bdab5e2fbb5537d3127b9fc9f9009318717c912fd8f93c704813"
+  },
+  "inputs_unchanged": true,
+  "aggregate": "results/cowboys/metrics/aggregate/experiment_summary.json",
+  "generated_figure_count": 14,
+  "statistics_note": "Three verification reruns share seed 1. Missing recorded oracle version/initialization policy and repeated seed prevent full-budget seed statistics. No threshold supplied; hit metrics null.",
+  "tests": {
+    "command": "python -m unittest tests.test_molecular_metrics tests.test_structure tests.test_cowboys_paper_report tests.test_cowboys_fidelity -v",
+    "passed": 39,
+    "failed": 0
+  },
+  "solver_and_runner_files_changed": false,
+  "run_sh_change": "one additive post-run export command; optimization invocations unchanged",
+  "shell_syntax_check": "Git Bash bash -n scripts/experiments/run.sh passed",
+  "optimization_or_oracle_rerun": false,
+  "real_run_counts": {
+    "completed_one_step": 2,
+    "partial_initialization_only": 1
+  }
+}

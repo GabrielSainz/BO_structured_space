@@ -43,6 +43,10 @@ from hdbo_benchmark.utils.logging.idempotence_of_experiments import (
     experiment_has_already_run,
 )
 from hdbo_benchmark.utils.logging.wandb_observer import ObserverConfig
+from hdbo_benchmark.utils.logging.gp_predictions import (
+    PREDICTION_CONVENTIONS,
+    attach_gp_prediction_recorder,
+)
 
 ITERATION_METRIC_SOLVERS = {
     "cowboys",
@@ -221,6 +225,21 @@ def _save_solver_progress(
     if best_performance.size > 0 and np.isfinite(best_performance).any():
         best_value = float(np.nanmax(best_performance))
 
+    # Separate additive sidecar: legacy checkpoint/iteration formats remain intact.
+    predictions = getattr(solver, "pre_evaluation_prediction_history", None)
+    predictions_path = output_dir / f"{solver_name}_{function_name}_{seed}_predictions.json"
+    predictions_written = False
+    if predictions is not None:
+        predictions_payload = {
+            "schema_version": "1.0.0", "solver_name": solver_name,
+            "function_name": function_name, "seed": int(seed),
+            "conventions": PREDICTION_CONVENTIONS, "predictions": predictions,
+        }
+        predictions_written = _write_with_retries(
+            predictions_path, lambda tmp_path: _write_json(tmp_path, predictions_payload),
+            "pre-evaluation GP predictions",
+        )
+
     status_payload = {
         "solver_name": solver_name,
         "function_name": function_name,
@@ -236,6 +255,9 @@ def _save_solver_progress(
         ),
         "diagnostic_objective_evaluations_enabled": evaluate_top_candidate_objectives,
     }
+    if predictions is not None:
+        status_payload["pre_evaluation_predictions_enabled"] = True
+        status_payload["predictions_file"] = predictions_path.name if predictions_written else None
     if hasattr(solver, "get_run_configuration"):
         status_payload["solver_configuration"] = solver.get_run_configuration()
     _write_with_retries(
@@ -408,6 +430,9 @@ def _main(
         diffusion_config=diffusion_config_for_path,
     ).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    if solver_name == "cowboys":
+        attach_gp_prediction_recorder(solver, initial_history_size)
 
     # 3. Optimize with checkpointing after every iteration when step() is available
     completed_iterations = 0

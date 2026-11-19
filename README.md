@@ -148,6 +148,22 @@ python -m hdbo_benchmark.evaluation.plot_iteration_metrics --help
 python -m hdbo_benchmark.evaluation.table_results
 ```
 
+The COWBOYS sweep also exports offline molecular metrics to
+`results/cowboys/<RUN_ID>/metrics/<source-stem>/run.json`. Regenerate or aggregate
+without running optimization:
+
+```bash
+python -m hdbo_benchmark.evaluation export --results-dir results/cowboys/<RUN_ID> --planned-bo-steps 300
+python -m hdbo_benchmark.evaluation aggregate --results-dir results/cowboys/<RUN_ID>
+```
+
+See [offline molecular metrics](docs/MOLECULAR_METRICS.md) for the artifact audit,
+task-specific hit thresholds, missing data, AUC definitions and comparison guards.
+Within each exported run folder, `summary.json` provides the small overview and
+`evaluations.csv` pairs actual scores with available pre-evaluation GP means,
+uncertainties and improvement diagnostics. `run.json` retains all observations
+and metric trajectories; large candidate diagnostics have a linked sidecar.
+
 The table module retains its existing hardcoded result selection and top-level
 printing. W&B settings remain in `utils/constants.py`; use the existing
 `--wandb-mode disabled` for local verification.

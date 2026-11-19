@@ -1,0 +1,33 @@
+{
+  "solver_name": "cowboys",
+  "function_name": "albuterol_similarity",
+  "seed": 1,
+  "initial_history_size": 10,
+  "status": "completed",
+  "completed_iterations": 1,
+  "best_value": 0.32941176470588235,
+  "history_file": "cowboys_albuterol_similarity_1_history.npz",
+  "iteration_results_enabled": true,
+  "iteration_results_file": "cowboys_albuterol_similarity_1_iteration_results.json",
+  "diagnostic_objective_evaluations_enabled": false,
+  "solver_configuration": {
+    "implementation": "cowboys_corrected_pcn_v1",
+    "latent_sampling_coordinates": "raw_vae_standard_normal",
+    "history_coordinates": "normalized",
+    "gp_observations": "actual_evaluated_structures",
+    "novelty": "canonical_smiles",
+    "threshold_policy": "fixed_incumbent",
+    "batch_size": 1,
+    "latent_dim": 128,
+    "num_chains": 1,
+    "n_steps": 100,
+    "max_sampling_steps": 10000,
+    "beta_adaptation": "upstream_diminishing_log_beta_target_0.234",
+    "vae_bounds": [
+      -10.0,
+      10.0
+    ],
+    "vae_checkpoint": "C:\\Users\\gabri\\OneDrive - University of Copenhagen\\Escritorio\\university_of_copenhagen\\ku\\block_6\\project_outside_the_course_scope\\experiments\\ROTLSC\\data\\trained_models\\training_vae_on_zinc_250k\\latent_dim-128-batch_size-512-lr-0.0005-seed-1.pt",
+    "vae_checkpoint_sha256": "7c29cd598dd42b8dd1a9ddf84ffacd8bfc3131912eb2af684d5e0cedf3a55513"
+  }
+}
