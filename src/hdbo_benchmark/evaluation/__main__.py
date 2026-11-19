@@ -16,10 +16,18 @@ def main():
     aggregate.add_argument("--results-dir", type=Path, action="append", required=True)
     aggregate.add_argument("--output-dir", type=Path)
     aggregate.add_argument("--no-plots", action="store_true")
+    improvement = commands.add_parser("improvement", help="Analyze recorded EI versus realized record gains offline")
+    improvement.add_argument("--status-file", type=Path, required=True)
+    improvement.add_argument("--output-dir", type=Path)
     validate = commands.add_parser("validate", help="Validate generated run.json files")
     validate.add_argument("paths", type=Path, nargs="+")
     args = parser.parse_args()
     try:
+        if args.command == "improvement":
+            from .improvement_analysis import improvement_report
+            report = improvement_report(args.status_file, args.output_dir)
+            print(f"Analyzed {report['summary']['n_bo_steps']} BO steps. Plot: {report['files']['png']}")
+            return 0
         if args.command == "export":
             from .export_runs import export_directory
             from .metric_io import read_json

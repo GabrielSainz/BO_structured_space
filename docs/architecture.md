@@ -151,9 +151,14 @@ The offline [molecular metric exporter](MOLECULAR_METRICS.md) extends `evaluatio
 with an adapter for existing COWBOYS checkpoints, prefix metrics, run JSON
 validation, and independent-run aggregation/plots. `scripts/experiments/run.sh`
 has one additive post-run export command scoped to its fresh output directory.
-Solver implementations, optimization invocations, original result writers and
-legacy plots are unchanged. New JSON/tables/figures live under `metrics/` in
-the selected result directory.
+Solver implementations, optimization invocations and legacy plots are unchanged.
+The runner also attaches a pre-oracle GP prediction recorder for newly started
+COWBOYS processes and saves an additive `_predictions.json` sidecar. The recorder
+passes the selected candidate through unchanged and preserves RNG states.
+New JSON/tables/figures live under `metrics/` in the selected result directory;
+read `summary.json` for the small overview and `evaluations.csv` for observed
+scores paired with predictions. Large ranked-candidate diagnostics are linked
+from `run.json` as a separate lossless `diagnostics.json`.
 
 `utils/constants.py` still computes repository paths from its existing depth.
 Some other modules independently do the same. Molecular VAE lookup still checks

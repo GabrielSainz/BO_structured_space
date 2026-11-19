@@ -224,6 +224,8 @@ def _plot(groups, trajectory_rows, output):
                              marker="o" if record["eligible"] else "x")
         _finish_plot(fig, axis, manifest, figure_dir, group_id, "quality_vs_diversity", task, any_values,
                      "AUC Top-1 (observed horizon; see per-run scope)", "AUC online diverse hits (count)")
+    from .prediction_plots import plot_predictions
+    manifest.extend(plot_predictions(groups, output))
     return manifest
 
 

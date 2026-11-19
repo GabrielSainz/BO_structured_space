@@ -7,6 +7,7 @@ from pathlib import Path
 from .cowboys_artifacts import load_cowboys
 from .metric_io import digest_json, display_path, io_path, read_json, write_json
 from .molecular_metrics import FINGERPRINT, HITS, QUALITY, compute_metrics, finite, normalized_auc
+from .prediction_metrics import join_predictions, prediction_summary
 
 
 def _version(name):
@@ -183,6 +184,12 @@ def build_run(status_path, *, task_config=None, planned_bo_steps=None):
             observation["recorded_acquisition"] = {"selection_score": matches[0].get("selection_score"),
                 "convention": "qLogExpectedImprovement" if saved_config.get("implementation") == "cowboys_corrected_pcn_v1" else "unspecified_selection_score",
                 "source": "iteration top_candidate_diagnostics matched by canonical identity; no GP recomputation"}
+    prediction_count = join_predictions(evaluations, artifact.get("predictions"), warnings)
+    if prediction_count:
+        missing.pop("gp_predictions_and_calibration", None)
+        unrecorded = sum(e["phase"] == "optimization" and e.get("pre_evaluation_prediction") is None for e in evaluations)
+        if unrecorded:
+            missing["gp_predictions_partial"] = f"{unrecorded} BO observations have no matched pre-evaluation GP record"
     return {
         "schema_version": "1.0.0", "run_id": run_id,
         "experiment_group_id": display_path(status_path.parent), "status": exported_status,
@@ -207,6 +214,7 @@ def build_run(status_path, *, task_config=None, planned_bo_steps=None):
                    "planned_budget_source": "task_config" if "bo_steps_planned" in config else
                        ("export_argument" if planned is not None else None)},
         "metric_policy": policy, "evaluations": evaluations, "trajectory": trajectory,
+        "prediction_conventions": (artifact["predictions"].get("conventions") if artifact.get("predictions") else None),
         "summary": {"available": bool(trajectory), "full_budget_completed": full,
                     "auc_scope": scope, "auc_horizon": horizon,
                     "n_observed_evaluations": len(evaluations),
@@ -214,6 +222,7 @@ def build_run(status_path, *, task_config=None, planned_bo_steps=None):
                     "n_completed_bo_steps": horizon, "n_oracle_calls_total": None,
                     "diagnostic_objective_evaluations_enabled": status.get("diagnostic_objective_evaluations_enabled"),
                     "final": final, "auc": auc,
+                    "gp_diagnostics": prediction_summary(evaluations),
                     "final_source": "trajectory" if trajectory else "recorded_status_best_value_only",
                     "final_missing_reason": trajectory[-1]["missing_reason"] if trajectory else
                         {"top_k_and_diversity": "Complete observation prefix unavailable; recorded status maximum alone does not determine Top-K"},
@@ -255,8 +264,11 @@ def export_directory(results_dir, *, recursive=False, task_configs=None, planned
             run = build_run(path, task_config=(task_configs or {}).get(task), planned_bo_steps=planned_bo_steps)
             validate_run(run)
             output = path.parent / "metrics" / path.name.removesuffix("_status.json") / "run.json"
-            write_json(output, run)
-            outputs.append({"run_id": run["run_id"], "path": display_path(output), "status": run["status"]})
+            from .run_views import write_run_views
+            write_run_views(output.parent, run)
+            outputs.append({"run_id": run["run_id"], "path": display_path(output), "status": run["status"],
+                            "summary_path": display_path(output.parent / "summary.json"),
+                            "evaluations_path": display_path(output.parent / "evaluations.csv")})
         except (ValueError, OSError, KeyError, TypeError) as exc:
             issues.append({"source": display_path(path), "missing_reason": str(exc)})
     # Report artifacts whose provenance/boundaries cannot safely be inferred from names.
@@ -294,6 +306,13 @@ def validate_run(run, *, schema=True):
             except jsonschema.ValidationError as exc:
                 raise ValueError(f"Run schema violation at {list(exc.absolute_path)}: {exc.message}") from exc
     trajectory = run["trajectory"]
+    for observation in run["evaluations"]:
+        prediction = observation.get("pre_evaluation_prediction")
+        if prediction is not None:
+            if (observation["phase"] != "optimization"
+                    or prediction.get("n_training_observations") != observation["observation_index"]
+                    or prediction.get("captured") != "after_candidate_selection_before_oracle_evaluation"):
+                raise ValueError("GP predictions must precede their observed evaluation")
     if trajectory and [p["bo_step"] for p in trajectory] != list(range(len(trajectory))):
         raise ValueError("Trajectory must contain exactly steps 0..B")
     if trajectory:

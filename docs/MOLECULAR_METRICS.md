@@ -50,7 +50,11 @@ python -m hdbo_benchmark.evaluation export --results-dir results/cowboys/<RUN_ID
 python -m hdbo_benchmark.evaluation aggregate --results-dir results/cowboys/<RUN_ID>
 ```
 
-Export writes `metrics/<source-stem>/run.json` and `metrics/export_manifest.json`.
+Export writes `metrics/<source-stem>/run.json`, a readable `summary.json`, a flat
+`evaluations.csv`, a lossless `diagnostics.json` sidecar when original iteration
+diagnostics exist, and `metrics/export_manifest.json`. Large candidate/latent
+arrays are linked from `run.json` instead of duplicated inside it; observations,
+trajectories, configuration and all scientific metrics remain in `run.json`.
 It is deterministic and atomically replaces only its own generated files.
 Discovery is nonrecursive unless `--recursive` is explicitly supplied; preflight
 directories are always excluded. Missing/unreadable artifacts and failures before
@@ -165,10 +169,11 @@ New source files:
 - `docs/MOLECULAR_METRICS.md`
 - `docs/verification/molecular_metrics_verification.json`
 
-Modified files: one additive exporter command in `scripts/experiments/run.sh`,
-and documentation links in `README.md` and `docs/architecture.md`. No solver,
-runner, objective, GP, logging utility or old plot was edited. No optimization,
-oracle rescore, training, download, sweep or GPU execution was launched.
+The initial metrics implementation modified one additive exporter command in
+`scripts/experiments/run.sh` and documentation links in `README.md` and
+`docs/architecture.md`. The later GP recording extension below adds a runner-side
+observer and prediction sidecar; solver implementations, objectives, acquisition,
+GP fitting and legacy plots remain unchanged.
 
 Existing real artifacts were exported under:
 
@@ -207,3 +212,104 @@ source hashes and generated paths. Tests include an exact real fixture, byte
 preservation and deterministic repeat export, hand-computed prefix metrics,
 10+300 indexing, strict Tanimoto boundaries, partial/missing data, schema and
 semantic validation, compatibility groups, seed replication and offline plots.
+
+## Pre-evaluation GP predictions and readable views
+
+For newly started COWBOYS processes, the runner attaches
+`utils/logging/gp_predictions.py` to the candidate-return boundary. It calls the
+original `next_candidate()` first, records the existing fitted GP posterior for
+the selected molecule, and returns the exact same candidate object. This occurs
+before `step()` calls the oracle and updates history. It does not refit a GP,
+change acquisition values, call an oracle, or change evaluation order. Python,
+NumPy and Torch RNG states are restored after diagnostic calls. Diagnostic errors
+are saved as missing reasons and do not abort optimization.
+
+`cowboys_<task>_<seed>_predictions.json` is an additive source sidecar, saved at
+the existing checkpoints and final save, even if legacy iteration JSON is
+disabled. Status advertises `predictions_file` and
+`pre_evaluation_predictions_enabled`. Failed evaluations can leave an unmatched
+prediction attempt; it is retained in the source sidecar, not invented as an
+observation. The exporter only joins matching observation index, canonical
+identity, BO step and a training history ending before that observation.
+
+Recorded fields use the original recorded objective scale (BoTorch's outcome
+standardization is undone by `posterior`):
+
+| Field | Meaning |
+|---|---|
+| `mean` | Pre-evaluation GP posterior mean |
+| `latent_std` | Posterior standard deviation excluding observation noise |
+| `predictive_std` | Predictive standard deviation including GP likelihood noise |
+| `incumbent_for_acquisition` | The same historical maximizing threshold, including the existing NaN penalty |
+| `analytic_expected_improvement` | Analytic Gaussian EI from the latent posterior, relative to that incumbent |
+
+Analytic EI is an additional diagnostic, distinct from the existing Monte Carlo
+`qLogExpectedImprovement` acquisition. The latter remains the recorded
+`recorded_acquisition.selection_score` / CSV `recorded_log_ei`; it is never
+replaced in candidate selection. GP predictions and observed scores are paired
+in `run.json` under `evaluations`, with `prediction_residual = observed - mean`.
+Summary diagnostics include prequential RMSE, Gaussian NLL using predictive
+variance, and coverage of the central Gaussian 90% predictive interval. These
+are diagnostics on adaptively selected points, not independent test-set metrics.
+
+Open `metrics/<source-stem>/summary.json` for final metrics/AUCs/completion and
+GP diagnostic summaries. Open `evaluations.csv` to compare actual score,
+predicted mean, both uncertainty definitions, analytic EI, recorded log-EI and
+realized improvement on one row. All original scientific metric fields and raw
+observations remain in `run.json`; only the duplicated candidate diagnostic
+payload moves to `diagnostics.json`, linked with its SHA-256 hash. Source
+`*_iteration_results.json` and all legacy plots retain their existing format.
+Aggregation adds predicted-versus-observed and per-run prediction/uncertainty
+figures; existing molecular metric figures are preserved.
+
+Already running Python processes do not acquire the recorder retroactively.
+Subsequent task/seed processes started by a running shell sweep load the updated
+runner, so a sweep may contain mixed prediction availability. Old runs retain
+null predictions and explicit missing reasons. No historical GP is refitted to
+fill missing records, and no running sweep needs to be interrupted.
+
+Additional checks live in `tests/test_gp_predictions.py`: before-oracle timing,
+candidate/oracle-count/chain/RNG parity, prediction failure isolation, a real
+BoTorch posterior on the original score scale, saving with legacy JSON disabled,
+causal record matching, missing historical predictions, clean-view repeatability
+and byte-identical existing plot images. No solver file is changed.
+
+The current extension passed 49 checks. A bounded real CPU albuterol run also
+recorded a pre-evaluation mean and both uncertainty definitions, with candidate,
+score and structure histories exactly equal to the existing uninstrumented
+seed-1 verification run. See
+[`verification/gp_prediction_logging_verification.json`](verification/gp_prediction_logging_verification.json)
+for the prediction values, source paths and validation evidence. Clean views were
+also generated for the already completed DRD2 seed-1 run without changing any of
+its original inputs; its unrecorded historical GP values remain null.
+
+## EI versus realized improvement diagnostics
+
+The offline `improvement` command adds a focused four-panel analysis without
+changing existing plots or optimization:
+
+```bash
+python -m hdbo_benchmark.evaluation improvement --status-file results/cowboys/<RUN_ID>/cowboys_<task>_<seed>_status.json
+```
+
+It writes `improvement_analysis.{png,pdf,csv,json,md}` under that run's
+`metrics/<source-stem>/figures/` (or `--output-dir`). Panels compare per-step
+expected/realized gain, cumulative conditional forecasts/achieved record gain,
+the best-score/Top-10 trajectories, and the EI uplift above positive mean advantage.
+Initialization supplies the first incumbent. Every observed improvement uses
+the best eligible score strictly **before** evaluation; gains telescope to
+final best minus initial best. Tied scores create no new record. Expected gain
+is comparable only when the logged acquisition incumbent matches that prefix.
+Missing increments are not zero-filled or interpolated in cumulative curves.
+
+Analytic Gaussian EI and exp(recorded qLogEI) are labeled separately: the latter
+is a smoothed Monte Carlo proxy. The uncertainty uplift is
+`EI - max(mean - incumbent, 0)`, a Jensen gap, not the two standard EI formula
+terms or a change to the acquisition. Cumulative conditional EI is descriptive,
+not a guaranteed/feasible final-score forecast. One selected adaptive run is not
+a collection of independent replicates or proof that the policy ranks candidates
+optimally. The command currently supports the recorded maximizing scale and one
+evaluation per BO step. Source hashes are checked after plotting; the original
+artifacts and mean/std plot are preserved. Hand calculations, prefix causality,
+ties, incompatible thresholds and missing EI are covered by
+`tests/test_improvement_analysis.py`.

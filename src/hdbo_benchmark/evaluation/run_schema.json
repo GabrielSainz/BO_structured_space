@@ -38,7 +38,19 @@
         "valid_molecule": {"type": ["boolean", "null"]},
         "actual_oracle_call": {"type": ["boolean", "null"]},
         "is_duplicate": {"type": ["boolean", "null"]},
+        "pre_evaluation_prediction": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/prediction"}]},
         "missing_reason": {"type": "object"}
+      }
+    },
+    "prediction": {
+      "type": "object", "required": ["mean", "latent_std", "predictive_std", "analytic_expected_improvement", "captured", "n_training_observations"],
+      "properties": {
+        "mean": {"$ref": "#/$defs/nullable_number"},
+        "latent_std": {"type": ["number", "null"], "minimum": 0},
+        "predictive_std": {"type": ["number", "null"], "minimum": 0},
+        "analytic_expected_improvement": {"type": ["number", "null"], "minimum": 0},
+        "captured": {"const": "after_candidate_selection_before_oracle_evaluation"},
+        "n_training_observations": {"type": "integer", "minimum": 0}
       }
     },
     "step": {

@@ -69,6 +69,23 @@ def load_cowboys(status_path: Path):
     best_path = status_path.with_name(status_path.name.removesuffix("_status.json") + ".npy")
     if io_path(best_path).exists():
         sources.append(best_path)
+    predictions = None
+    predictions_path = _companion(status_path, status.get("predictions_file"), "_predictions.json")
+    if io_path(predictions_path).exists():
+        try:
+            predictions = read_json(predictions_path)
+            if not isinstance(predictions, dict) or any(
+                predictions.get(key) != status.get(key) for key in ("solver_name", "function_name", "seed")
+            ) or not isinstance(predictions.get("predictions"), list) or not all(
+                isinstance(record, dict) for record in predictions.get("predictions", [])
+            ):
+                raise ValueError("Prediction sidecar metadata disagrees with status")
+            sources.append(predictions_path)
+        except (ValueError, OSError) as exc:
+            predictions = None
+            warnings.append(f"GP predictions unreadable: {exc}")
+    elif status.get("predictions_file"):
+        warnings.append("Status references a missing GP prediction sidecar")
     return {"status": status, "scores": scores, "structures": structures,
-            "iterations": clean(iterations), "warnings": warnings,
+            "iterations": clean(iterations), "predictions": clean(predictions), "warnings": warnings,
             "sources": [{"path": display_path(p), "sha256": digest_file(p)} for p in sources]}
