@@ -59,7 +59,7 @@ class COWBOYS(BaseBayesianOptimization):
         device: torch.device = torch.device("cpu"),
         num_chains: int = 1,
         n_steps: int = 100,
-        max_sampling_steps: int = 10_000,
+        max_sampling_steps: int = 50_000,
     ):
         """
         Initialize the VanillaBayesianOptimization class.

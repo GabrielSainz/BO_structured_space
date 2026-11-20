@@ -61,6 +61,47 @@ FUNCTIONS=albuterol_similarity SEEDS=1 MAX_ITER=1 bash scripts/experiments/run.s
 have already passed. `RUN_ID`, `PYTHON_BIN` and `HDBO_TORCH_DEVICE` can also be
 set explicitly. No full sweep was launched during this implementation work.
 
+### Rerun the eight incomplete November 17/19 runs
+
+On 2026-11-20, the user authorized raising the default `max_sampling_steps`
+from 10,000 to 50,000. This only extends the finite pCN sampling allowance
+within each BO iteration. The one-chain configuration, minimum 100 steps,
+fixed threshold, novelty rule, beta adaptation and objective budget remain
+unchanged. New status JSON files record `max_sampling_steps: 50000`; historical
+artifacts remain unchanged. Treat these as changed-cap experiments, and retain
+the original failed/interrupted attempts when reporting results. A larger cap
+does not guarantee successful completion.
+
+`configs/cowboys_missing_20261120.tsv` selects exactly DRD2 seed 2, scaffold hop
+seed 1, ranolazine seed 4 and albuterol seeds 1-5. These are fresh 300-step runs,
+not resumptions of the partial observation archives. Run from the repository
+root in PowerShell:
+
+```powershell
+Remove-Item Env:FUNCTIONS, Env:SEEDS, Env:DRY_RUN -ErrorAction SilentlyContinue
+$env:RUNS_FILE = 'configs/cowboys_missing_20261120.tsv'
+$env:RUN_ID = "cowboys_missing_cap50000_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+$env:MAX_ITER = '300'
+$env:HDBO_TORCH_DEVICE = 'cpu'
+& 'C:/Users/gabri/miniconda3/Scripts/conda.exe' run --no-capture-output -n hdbo_benchmark 'C:/Program Files/Git/bin/bash.exe' scripts/experiments/run.sh
+```
+
+Keep `FUNCTIONS` and `SEEDS` unset when using `RUNS_FILE`; combining them is
+rejected to avoid an unintended Cartesian product. The TSV is validated for
+duplicate pairs before any experiment is launched and copied into the fresh
+output directory as `run_plan.tsv`. `DRY_RUN=1` prints only the selected pairs,
+without tests, preflight, objectives, models or output-directory creation.
+The normal launch retains the existing separate one-step preflight and offline
+post-run metrics export. The launcher rejects an existing output directory.
+
+Validation for this change: 20 checks passed using
+`python -m unittest tests.test_structure tests.test_cowboys_fidelity tests.test_cowboys_paper_report tests.test_cowboys_sweep -v`
+in the activated Python 3.10 environment. Git Bash syntax validation and
+`git diff --check` passed. Selection tests use dry runs only, verify all eight
+pairs and preserve the existing Cartesian sweep order, and reject duplicate or
+ambiguous selections before creating outputs. No real objective or sweep was run
+to validate this cap increase.
+
 ## What changed scientifically
 
 - pCN now proposes in raw VAE coordinates with prior `N(0, I)`. Only the
@@ -77,10 +118,12 @@ set explicitly. No full sweep was launched during this implementation work.
   observed history. Acquisition scores select latent indices directly,
   including when different molecules have identical fingerprints.
 - The incumbent threshold stays fixed throughout sampling and EI selection.
-  If no novel valid molecule is found in 10,000 pCN steps, the run fails
+  If no novel valid molecule is found in 50,000 pCN steps, the run fails
   explicitly rather than relaxing its target or looping forever. This cap is
   a documented operational addition; direct solver users can configure
   `max_sampling_steps`.
+  The original corrected baseline used a 10,000-step cap; the current default
+  was raised under explicit user authorization on 2026-11-20, as documented above.
 - The default is one chain and 100 minimum steps, matching the paper's reported
   single-point setup. The released implementation's diminishing log-beta
   adaptation, target 0.234 and persistence between BO iterations are retained.

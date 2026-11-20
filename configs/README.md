@@ -13,6 +13,7 @@ duplicating settings or changing relative paths.
 | Additional requirements | [`../requirements.txt`](../requirements.txt), [`../requirements-dev.txt`](../requirements-dev.txt) | Root; overlaps with metadata remain technical debt |
 | Current experiment settings | [`../scripts/experiments/`](../scripts/experiments/) | `run.sh` uses the corrected COWBOYS setup; other historical launchers retain their settings |
 | COWBOYS paper reference | [`cowboys_paper_table1.json`](cowboys_paper_table1.json) | Table 1 task list, reported values, protocol and verified checkpoint digest; see [implementation notes](../docs/COWBOYS_IMPLEMENTATION.md) |
+| COWBOYS incomplete-run selection | [`cowboys_missing_20261120.tsv`](cowboys_missing_20261120.tsv) | Eight incomplete task/seed pairs from the merged November 17/19 runs; pass as `RUNS_FILE` to `scripts/experiments/run.sh`. New runs use the authorized 50,000-step sampling cap. |
 | Scheduler settings | [`../scripts/slurm/`](../scripts/slurm/) | Submit from the repository root; original SLURM headers and arguments preserved |
 | CLI defaults | [`../src/hdbo_benchmark/experiments/run.py`](../src/hdbo_benchmark/experiments/run.py) | Click options and `_main`; retain the existing `--sufix` spelling |
 | Method defaults | [`../src/hdbo_benchmark/solvers/`](../src/hdbo_benchmark/solvers/) | Constructor defaults and `registry.py`; no extraction to config files |

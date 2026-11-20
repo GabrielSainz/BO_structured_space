@@ -127,6 +127,7 @@ class COWBOYSFidelityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "original evaluated"):
             solver.set_vae_and_bounds(ToyVAE(), (-10., 10.))
         solver.set_vae_and_bounds(ToyVAE(), (-10., 10.), initial_structures=np.array(["[C]"]))
+        self.assertEqual(solver.get_run_configuration()["max_sampling_steps"], 50_000)
         solver.bounds = (-2., 2.)
         np.testing.assert_array_equal(solver._unit_to_latent(np.array([[.5]])), [[0.]])
 
