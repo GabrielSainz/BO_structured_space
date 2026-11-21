@@ -19,7 +19,7 @@ launchers retain their settings.
 
 Example: `bash scripts/experiments/run_lsbo_poli.sh`. This is an existing sweep,
 not a lightweight check. Inspect scripts before running them: some run many
-seeds or hundreds of iterations. No sweep was executed during Phase 1.
+seeds or hundreds of iterations.
 
 SLURM entry points are `scripts/slurm/batch.sh` and
 `scripts/slurm/batch_gpu.sh`. Submit them directly from the repository root with

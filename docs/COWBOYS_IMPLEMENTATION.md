@@ -59,9 +59,9 @@ FUNCTIONS=albuterol_similarity SEEDS=1 MAX_ITER=1 bash scripts/experiments/run.s
 
 `SKIP_PREFLIGHT=1` skips the unit tests and separate real preflight when they
 have already passed. `RUN_ID`, `PYTHON_BIN` and `HDBO_TORCH_DEVICE` can also be
-set explicitly. No full sweep was launched during this implementation work.
+set explicitly.
 
-### Rerun the eight incomplete November 17/19 runs
+### Run pending task and seed pairs
 
 On 2026-11-20, the user authorized raising the default `max_sampling_steps`
 from 10,000 to 50,000. This only extends the finite pCN sampling allowance
@@ -72,15 +72,16 @@ artifacts remain unchanged. Treat these as changed-cap experiments, and retain
 the original failed/interrupted attempts when reporting results. A larger cap
 does not guarantee successful completion.
 
-`configs/cowboys_missing_20261120.tsv` selects exactly DRD2 seed 2, scaffold hop
-seed 1, ranolazine seed 4 and albuterol seeds 1-5. These are fresh 300-step runs,
-not resumptions of the partial observation archives. Run from the repository
-root in PowerShell:
+`configs/cowboys_pending.tsv` contains only albuterol seeds 1-5, the incomplete
+pairs in the November 21 consolidated results. Completed DRD2, scaffold hop and
+ranolazine pairs have been removed from the pending selection. These are fresh
+300-step runs, not resumptions of partial observation archives. Run from the
+repository root in PowerShell:
 
 ```powershell
 Remove-Item Env:FUNCTIONS, Env:SEEDS, Env:DRY_RUN -ErrorAction SilentlyContinue
-$env:RUNS_FILE = 'configs/cowboys_missing_20261120.tsv'
-$env:RUN_ID = "cowboys_missing_cap50000_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+$env:RUNS_FILE = 'configs/cowboys_pending.tsv'
+$env:RUN_ID = "cowboys_pending_cap50000_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
 $env:MAX_ITER = '300'
 $env:HDBO_TORCH_DEVICE = 'cpu'
 & 'C:/Users/gabri/miniconda3/Scripts/conda.exe' run --no-capture-output -n hdbo_benchmark 'C:/Program Files/Git/bin/bash.exe' scripts/experiments/run.sh
@@ -94,13 +95,8 @@ without tests, preflight, objectives, models or output-directory creation.
 The normal launch retains the existing separate one-step preflight and offline
 post-run metrics export. The launcher rejects an existing output directory.
 
-Validation for this change: 20 checks passed using
-`python -m unittest tests.test_structure tests.test_cowboys_fidelity tests.test_cowboys_paper_report tests.test_cowboys_sweep -v`
-in the activated Python 3.10 environment. Git Bash syntax validation and
-`git diff --check` passed. Selection tests use dry runs only, verify all eight
-pairs and preserve the existing Cartesian sweep order, and reject duplicate or
-ambiguous selections before creating outputs. No real objective or sweep was run
-to validate this cap increase.
+`tests.test_cowboys_sweep` checks pending-pair selection, Cartesian sweep order
+and duplicate/ambiguous plan rejection using dry runs without models or objectives.
 
 ## What changed scientifically
 

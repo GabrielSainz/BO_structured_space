@@ -1,5 +1,28 @@
 # Offline molecular metrics
 
+## Current consolidated results (2026-11-21)
+
+The November 17/19 experiment folders and November 20 cap-50,000 reruns are
+consolidated in `results/cowboys/merged_20261121/`. Its `RUN_SUMMARY.md`,
+`run_summary.csv`, `attempts.csv` and `merge_manifest.json` identify the selected
+whole attempt for every task/seed and retain failed/interrupted-run provenance.
+The selected working set has 20 completed and five partial runs. Seventeen
+completed runs use a 10,000-step sampling cap and three use 50,000; this is a
+progress collection, not a homogeneous five-seed algorithm comparison. Use
+`configuration_summary.csv` for cap-separated completed-run statistics.
+
+The former source folders, previous copied merge, verification/smoke/environment
+checks and their older metrics are preserved in the self-contained recovery
+archive `results/cowboys/_archive/cleanup_20261121.zip`. Its internal manifest maps
+every original path to SHA256-addressed contents, deduplicating byte-identical
+copies. Historical generated-result paths quoted below refer to that snapshot;
+the tracked verification JSON files in `docs/verification/` remain in place.
+`results/cowboys/merged_20261121/restore_sources.py` can reconstruct the original
+source tree into a fresh directory. `cleanup_result.json` records the cleanup,
+and `verification.json` records archive/selected-copy and metric validation.
+The canonical `metrics/<run-stem>/` exports are regenerated against the new
+paths without evaluating objectives or changing original checkpoint bytes.
+
 ## Artifact audit (2026-11-17)
 
 `scripts/experiments/run.sh` invokes root `run.py`, which forwards to
@@ -149,69 +172,18 @@ one BO step, and one failed before any completed BO step (initialization only).
 They demonstrate export and plots, not independent-seed uncertainty or a 300-step
 performance comparison. See the generated manifest for source hashes.
 
-## Handoff and generated artifacts
+## Verification
 
-New source files:
-
-- `src/hdbo_benchmark/evaluation/__main__.py`
-- `src/hdbo_benchmark/evaluation/cowboys_artifacts.py`
-- `src/hdbo_benchmark/evaluation/molecular_metrics.py`
-- `src/hdbo_benchmark/evaluation/export_runs.py`
-- `src/hdbo_benchmark/evaluation/aggregate_runs.py`
-- `src/hdbo_benchmark/evaluation/metric_io.py`
-- `src/hdbo_benchmark/evaluation/run_schema.json`
-- `tests/test_molecular_metrics.py`
-- `tests/fixtures/cowboys_checkpoint/README.md`
-- `tests/fixtures/cowboys_checkpoint/cowboys_albuterol_similarity_1.npy`
-- `tests/fixtures/cowboys_checkpoint/cowboys_albuterol_similarity_1_history.npz`
-- `tests/fixtures/cowboys_checkpoint/cowboys_albuterol_similarity_1_iteration_results.json`
-- `tests/fixtures/cowboys_checkpoint/cowboys_albuterol_similarity_1_status.json`
-- `docs/MOLECULAR_METRICS.md`
-- `docs/verification/molecular_metrics_verification.json`
-
-The initial metrics implementation modified one additive exporter command in
-`scripts/experiments/run.sh` and documentation links in `README.md` and
-`docs/architecture.md`. The later GP recording extension below adds a runner-side
-observer and prediction sidecar; solver implementations, objectives, acquisition,
-GP fitting and legacy plots remain unchanged.
-
-Existing real artifacts were exported under:
-
-- `results/cowboys/verification_conda_pcn_20261117T090618/metrics/cowboys_albuterol_similarity_1/run.json` (completed, one BO step)
-- `results/cowboys/verification_corrected_pcn_20261117T090506/metrics/cowboys_albuterol_similarity_1/run.json` (partial, initialization only; source failed)
-- `results/cowboys/verification_script_pcn_20261117T090734/metrics/cowboys_albuterol_similarity_1/run.json` (completed, one BO step)
-
-The real report is `results/cowboys/metrics/aggregate/experiment_summary.json`,
-with CSVs and `plot_manifest.json` alongside it. Fourteen available quality and
-internal-diversity figures are in its `figures/` directory. Missing hit metrics
-produce skipped entries in the manifest instead of empty/imputed figures.
-
-| Metric/data | Current real artifacts |
-|---|---|
-| Best-so-far, unique Top-1/10/100 | Computable from original structures and recorded scores, including t=0 |
-| Quality AUCs | Computable for the two positive-horizon runs; null for initialization-only run |
-| Top-10 internal diversity, novelty, observation duplicate rate | Computable offline with the stated identity/fingerprint policies |
-| Unique hits, online diverse hits, scaffolds and their AUCs | Implemented; null in these exports because no task hit threshold was supplied |
-| Recorded ranked candidate counts/log-EI | Preserved where present; never treated as additional observations |
-| Physical calls, call-based hit/repeated-evaluation rate | Null: no physical-call/cache flags |
-| GP predictive moments, calibration, timings, full proposal rates | Null/unavailable: not recorded |
-| Independent-seed mean/SD/CI on these artifacts | Excluded: same seed reruns and unrecorded oracle version/sampling policy |
-| Approximate Circles | Optional, not implemented; explicitly null |
-
-Verification:
+The tracked [verification evidence](verification/molecular_metrics_verification.json)
+records source hashes and the original one-step checks. Their generated outputs
+are in the recovery archive described above. Regression tests cover the real
+checkpoint fixture, byte preservation, deterministic export, hand-computed
+prefix metrics, 10+300 indexing, strict Tanimoto boundaries, partial/missing data,
+schema/semantic validation, compatibility groups and independent seed handling.
 
 ```bash
 python -m unittest tests.test_molecular_metrics tests.test_structure tests.test_cowboys_paper_report tests.test_cowboys_fidelity -v
-python -m hdbo_benchmark.evaluation export --results-dir results/cowboys/verification_script_pcn_20261117T090734 --planned-bo-steps 1
-python -m hdbo_benchmark.evaluation aggregate --results-dir results/cowboys
 ```
-
-The one-step budget above applies only to the existing verification run; normal
-`run.sh` exports use the actual `$MAX_ITER`. The tracked verification JSON records
-source hashes and generated paths. Tests include an exact real fixture, byte
-preservation and deterministic repeat export, hand-computed prefix metrics,
-10+300 indexing, strict Tanimoto boundaries, partial/missing data, schema and
-semantic validation, compatibility groups, seed replication and offline plots.
 
 ## Pre-evaluation GP predictions and readable views
 

@@ -5,10 +5,9 @@ using **poli** and **poli-baselines**, including molecular and protein objective
 latent representations, Gaussian processes and generative candidate proposals.
 The existing Python package is `hdbo_benchmark`.
 
-Phase 1 reorganizes existing implementations and entry points. It does not
-change algorithms, defaults, evaluation budgets or benchmark definitions.
-Subsequent objective diagnostics and compatibility fixes are documented below;
-new research methods remain future work.
+Canonical implementations live under `src/hdbo_benchmark/`. The corrected
+COWBOYS protocol, objective compatibility limits and offline metrics are
+documented below.
 
 ## Existing methods
 
@@ -24,7 +23,7 @@ The [registry](src/hdbo_benchmark/solvers/registry.py) also integrates upstream
 directed evolution, hill climbing, genetic algorithm, CMA-ES, random/coordinate
 LineBO, BAxUS, TuRBO, Hvarfner BO, ALEBO, Bounce, PR, SAASBO and LaMBO2. Optional
 methods require their original environments. Factory-only vanilla BO variants
-and older Ax/latent wrappers are retained; see the [audit](docs/REPOSITORY_AUDIT.md).
+and older Ax/latent wrappers are retained; see [architecture](docs/architecture.md).
 
 ## Installation
 
@@ -52,17 +51,16 @@ python -c "from tdc import Oracle; print('tdc ok')"
 These are retained setup instructions, not a newly validated dependency lock.
 The build system declares `setuptools<=68`; a local no-isolation build with
 setuptools 80.10.2 failed with the original and migrated metadata. The available
-Windows Phase 1 invocation also failed during COWBOYS GP fitting. A subsequent
-real one-step check passed under proper Conda activation; see the
-[corrected COWBOYS setup](docs/COWBOYS_IMPLEMENTATION.md). See
-[verification and limits](docs/MIGRATION_VERIFICATION.md) before interpreting
-these commands as a verified clean installation or successful experiment.
+Windows invocation also failed during COWBOYS GP fitting when the environment
+Python was called directly from the base shell. Use proper Conda activation;
+the [corrected COWBOYS setup](docs/COWBOYS_IMPLEMENTATION.md) records a successful
+bounded check. Clean-install and build limitations remain in
+[open technical work](docs/TECHNICAL_DEBT.md).
 Colab remains experimental because of chemistry/TDC and model-stack dependencies.
 
 Existing Conda definitions, extras and runtime settings are indexed in
 [configs/README.md](configs/README.md). Keep preprocessing separate from research
-execution; its environment targets Python 3.8/TorchDrug. No environments or
-scientific dependencies were installed or upgraded during this restructuring.
+execution; its environment targets Python 3.8/TorchDrug.
 
 ## Run existing entry points
 
@@ -73,20 +71,18 @@ python run.py --help
 python -m hdbo_benchmark.experiments.run --help
 ```
 
-Both invoke the same existing CLI. An example of the bounded CPU check used in
-Phase 1 (Bash) is:
+Both invoke the same CLI. In the activated environment, a bounded CPU check is:
 
 ```bash
-HDBO_TORCH_DEVICE=cpu OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python run.py --function-name albuterol_similarity --solver-name cowboys --n-dimensions 128 --max-iter 1 --seed 1 --no-strict-on-hash --wandb-mode disabled --tag phase1-structure --sufix your_unique_check_name
+HDBO_TORCH_DEVICE=cpu OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python run.py --function-name albuterol_similarity --solver-name cowboys --n-dimensions 128 --max-iter 1 --seed 1 --no-strict-on-hash --wandb-mode disabled --sufix your_unique_check_name
 ```
 
 In PowerShell, set `$env:HDBO_TORCH_DEVICE = 'cpu'`,
 `$env:OMP_NUM_THREADS = '1'`, and `$env:MKL_NUM_THREADS = '1'`, then invoke the
 same `python run.py ...` command. The existing PMO loader uses ten initial
 molecules; `--max-iter 1` requests one additional optimization iteration. The
-attempt failed before completing that iteration in the recorded environment;
-partial output creation and identical initial histories were checked.
-Use a fresh `--sufix` to avoid reusing existing output filenames.
+check evaluates a real objective and loads an existing VAE checkpoint. Use a
+fresh `--sufix` to avoid reusing existing output filenames.
 
 The previous long-run command remains valid in a working scientific environment:
 
@@ -121,7 +117,7 @@ scripts/experiments/  existing shell experiment configurations
 scripts/slurm/        scheduler entry points
 configs/              configuration index (no new config framework)
 tests/                lightweight structure and existing integration checks
-docs/                 architecture, audit, verification and future work
+docs/                 architecture, method notes, scientific evidence and open work
 data/                 datasets and pretrained checkpoints
 results/              generated optimization results
 reports/              figures and legacy report entry points
@@ -131,15 +127,16 @@ Root `run.py` remains the main convenience launcher. Redundant root method,
 sweep, report and test launchers have been removed. Installed module aliases in
 `src/` and old loader imports remain for import/serialization compatibility.
 Edit canonical implementations under `src/hdbo_benchmark/`. See the
-[cleanup record](docs/CLEANUP.md) for replacement commands.
+[architecture](docs/architecture.md) for module locations and compatibility.
 
 The current runner saves best-performance `.npy`, available history `.npz`,
-status JSON and requested iteration-metric JSON. Non-diffusion output goes to
+status JSON and requested iteration-metric JSON. COWBOYS writes to
+`results/cowboys/<sufix>/`. Other non-diffusion output goes to
 `results/new_vae_10_chain_100_steps_with_stoch_sampling_<sufix>/`; diffusion
 outputs use the existing parameter-derived subdirectories under
 `results/diffusion/`. Filenames include solver, function and seed. Older runners
-retain their own data/W&B output formats. Existing data and historical results
-were not moved or deleted.
+retain their own data/W&B output formats. Generated outputs and local logs are
+ignored; package analysis source under `src/hdbo_benchmark/results/` stays tracked.
 
 For local analysis:
 
@@ -190,12 +187,15 @@ With pytest and the relevant scientific dependencies installed, select them
 explicitly, for example `python -m pytest tests/test_main_entry_point.py -m hdbo_base`.
 This runs real benchmark combinations and is not a cheap smoke test. The redundant root test path has been removed; pytest discovers `tests/`.
 The existing tox environments remain available and can install dependencies/run
-benchmarks. They were not launched during Phase 1.
+benchmarks, so inspect their selection before invoking them.
 
 - [Architecture and compatibility](docs/architecture.md)
-- [Repository audit](docs/REPOSITORY_AUDIT.md) and [complete original file inventory](docs/FILE_INVENTORY.md)
-- [Migration map and verification](docs/MIGRATION_VERIFICATION.md)
-- [Known technical debt](docs/TECHNICAL_DEBT.md), including user-reported zero-valued objectives
-- [Future milestones](docs/ROADMAP.md): benchmark diagnostics, unified experiments,
-  algorithm verification, benchmarking/analysis, and new research methods
-- [Codex guidance](AGENTS.md)
+- [Corrected COWBOYS protocol](docs/COWBOYS_IMPLEMENTATION.md)
+- [PMO objective diagnostics](docs/PMO_DIAGNOSTICS.md)
+- [Offline molecular metrics](docs/MOLECULAR_METRICS.md)
+- [Open technical work](docs/TECHNICAL_DEBT.md)
+
+Local agent instructions (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`), agent settings,
+scratch files and runtime logs are intentionally excluded from version control.
+Keep documentation focused on current behavior and unresolved work; completed
+migration reports and duplicate planning inventories do not need to be recreated.

@@ -1,34 +1,59 @@
-# Existing technical debt
+# Open technical work
 
-These observations originated in Phase 1 and include subsequent PMO diagnostics.
-Severity describes impact; priority describes suggested order, not a deadline.
-See [the 25-task diagnostic report](PMO_DIAGNOSTICS.md) for measured findings and
-the limited error-handling fixes now implemented.
+Only unresolved work is listed here. Current behavior and completed scientific
+changes are documented in [architecture](architecture.md),
+[COWBOYS](COWBOYS_IMPLEMENTATION.md), [PMO diagnostics](PMO_DIAGNOSTICS.md) and
+[molecular metrics](MOLECULAR_METRICS.md). These items are not authorization to
+change experimental protocols or launch computation.
 
-| ID | Observation and evidence | Severity | Priority | Follow-up / acceptance |
-|---|---|---|---|---|
-| TD-01 | Confirmed: GSK3β hid old-classifier loading errors as zeros under scikit-learn 1.7.2; JNK3 fails on the same incompatibility. Valsartan SMARTS has legitimate sparse zeros and validated positive controls. The loader now exposes evaluator failures. | High: research conclusions may be affected | P0 | Validate a compatible production oracle runtime; current JNK3/GSK3β optimization remains blocked. Preserve and review affected result provenance. |
-| TD-02 | Historical Windows BLAS failure is reproducible when invoking the environment Python directly from the base shell. A real corrected COWBOYS iteration now passes under proper Conda activation (`conda run -n hdbo_benchmark`), without dependency/optimizer changes. See [current verification](COWBOYS_IMPLEMENTATION.md). | Environment-sensitive execution | P1 | Keep activation instructions and successful bounded-run evidence; clean-environment reproduction remains open |
-| TD-03 | `pyproject.toml` and `setup.cfg` split metadata; requirements files and Conda definitions overlap. Build requirement is `setuptools<=68`, but local research environment has 80.10.2. No-isolation wheel build hits metadata failure with both original and migrated metadata. | High for installation; not a proven supported-build failure | P1 | M1.1: verify declared build backend in isolation; then consolidate metadata under a separately scoped packaging change |
-| TD-04 | Scientific dependencies are incompletely constrained; Git dependencies track moving upstream revisions. gauche/SELFIES/PyTDC/chemistry installation relies partly on README instructions. | High: reproducibility | P1 | M1.1 / M2.2: record compatible versions and benchmark-specific requirements, test clean environment |
-| TD-05 | Current CLI, benchmark-specific runners, shell sweeps and compiler scripts maintain distinct protocols. Older modules reference `poli.objective_repository`. | Medium–high | P1 | M2.1: inventory behavioral differences before proposing a common runner; preserve historical adapters |
-| TD-06 | GP/acquisition/fingerprint/diagnostic code is duplicated across COWBOYS variants; flow v1/v2 have overlapping classes but distinct implementations. | Medium | P2 | M3.1–M3.2: verify equations first, then extract only behaviorally equivalent utilities with regression evidence |
-| TD-07 | Original pytest integrations construct real benchmark combinations at collection. Nine structural/compatibility/control test methods now exist; algorithm verification coverage remains limited. pytest is absent from the research environment. LaMBO2 filtering asks for `foldx_stability`, absent from generated setups. | Medium–high | P1 | M3.2: separate unit/integration collection, add algorithm tests; confirm LaMBO2 coverage |
-| TD-08 | CLI default `foldx_stability` differs from the loader's `rfp_foldx_stability`; factory-only vanilla BO branches are missing from `SOLVER_NAMES`. | Medium: interface inconsistency | P1 | M2.1: inventory accepted names, test intended aliases/defaults before changing behavior |
-| TD-09 | Root-relative and `__file__`-depth paths, package/data checkpoint duplication, environment YAML relative editable paths, and long Windows result names complicate relocation/standalone installs. | Medium | P1 | M2.2: explicit resource resolution with precedence tests; no checkpoint deduplication without provenance review |
-| TD-10 | Result formats are split between current JSON/NPZ/NPY, legacy data directories and W&B. Output names can be reused across runs. | High for provenance | P1 | M2.2–M2.3: preserve/import old artifacts; define collision policy and resumability without overwriting history |
-| TD-11 | Corrected: shared runner and metric builder now disable diagnostic objective calls by default. Explicit opt-in remains available and is recorded. Tests verify no extra calls during final saving; external side effects of opt-in diagnostics remain untested. See [implementation](COWBOYS_IMPLEMENTATION.md). | High for cost/protocol interpretation | Default fixed | Keep diagnostic cost separate from the BO budget; do not treat restored counters as undone work |
-| TD-12 | Table/legacy analysis modules contain top-level execution and hardcoded selections. GP, acquisition and model code share large solver modules. | Medium | P2 | M3.2 / M4: separate reusable components only after tests; preserve existing tables and interpretation |
-| TD-13 | Historical VAE source/checkpoints and some historical documentation remain. The inactive `gitignore` and duplicate launchers were removed in the subsequent cleanup. `workflows/website.yml` is outside active Actions configuration; CI targets `master`. | Low–medium | P2 | Separate maintenance review; retain history, do not activate deployment or remove files implicitly |
-| TD-14 | Old serialized payloads may refer to legacy module paths; class alias lookups are checked but full saved objects are not. External programs may inspect moved modules' `__file__`. | Medium | P1 | M2.2: test representative trusted historical objects in the exact original dependency environment |
-| TD-15 | Resolved: fallback TDC modules lacked `__spec__`, breaking repeated initialization. Package specs are retained and regression-tested. | Medium | Resolved | Retain the compatibility test when changing the shim. |
-| TD-16 | Raw `sa_tdc` is lower-is-easier, while current solvers/reporting maximize values. Installed poli PMO includes raw SA/logP extras; `drd2_docking` invokes a classifier. | High for scientific interpretation | P1 | Explicitly decide objective direction and suite membership before claiming standard 23-task PMO results; document authorized transformations. |
-| TD-17 | Corrected COWBOYS now applies pCN in raw VAE coordinates, preserving the intended Gaussian prior. Coordinate scale/centering and unbounded proposals have focused checks and a real one-step execution passed. See [implementation](COWBOYS_IMPLEMENTATION.md). | High: sampling target | Fixed | Preserve corrected-baseline provenance; full five-seed score comparison remains to be run |
-| TD-18 | Corrected: original evaluated structures survive the continuous wrapper and remain aligned with latent/score history and saved NPZ records. GP fitting uses those structures instead of initial reconstructions. See [implementation](COWBOYS_IMPLEMENTATION.md). | High: training-pair consistency | Fixed | Keep alignment regressions; old serialized solver objects were not certified for resume |
-| TD-19 | Corrected: EI selects canonical novel molecules by direct latent index, and the improvement threshold stays fixed. Sampling has an explicit failure cap, raised from 10,000 to 50,000 steps under user authorization on 2026-11-20. Focused tests cover novelty, fingerprint collisions and the fixed-threshold fallback. See [implementation](COWBOYS_IMPLEMENTATION.md). | Medium: repeated queries/acceptance | Fixed | Evaluate corrected trajectories separately from historical upstream results; retain changed-cap provenance |
+## Benchmark interpretation and runtime
 
-Structural corrections already made: canonical package locations for root
-methods/runner/local analysis, compatibility aliases, lazy solver exports,
-integration-test location, and an anchored runtime-results ignore rule. Subsequent
-diagnostics fix TDC re-entry metadata and expose hidden oracle exceptions. These
-changes do not establish biological validity or repair incompatible classifiers.
+- **Classifier compatibility:** JNK3 and GSK3beta need a compatible production
+  oracle runtime. Old cached classifiers failed with scikit-learn 1.7.2;
+  evaluator failures are now exposed. Preserve affected-run provenance.
+- **Objective conventions:** raw `sa_tdc` is lower-is-easier while the runner
+  maximizes recorded objectives. Decide transformations explicitly before
+  scientific comparisons. `drd2_docking` is a classifier objective; the installed
+  25-task set includes two properties beyond the original 23-task PMO suite.
+- **Sampler failures:** the COWBOYS cap is 50,000 pCN steps. Investigate acceptance,
+  decoder validity, novelty and beta when sampling stalls; a higher cap does not
+  establish successful completion. Keep 10,000- and 50,000-cap attempts distinct.
+- **Environment reproduction:** use Conda activation on Windows. Directly calling
+  the environment Python from the base shell can trigger the historical BLAS
+  failure. A clean environment and supported isolated wheel build still need
+  verification; the recorded local build used setuptools 80.10.2 against the
+  declared `setuptools<=68` backend.
+
+## Packaging and compatibility
+
+- Consolidate overlapping packaging/environment definitions only after recording
+  compatible chemistry, poli and model-stack versions. Moving Git dependencies
+  and partially constrained scientific packages limit reproducibility.
+- Repository-relative resources, duplicated checkpoint locations and old
+  environment working-directory assumptions complicate relocation. Preserve
+  checkpoint bytes and lookup precedence when improving resource resolution.
+- Import aliases are checked, but full historical serialized solver objects and
+  consumers of module `__file__` have not been certified.
+- CLI default `foldx_stability` differs from loader key `rfp_foldx_stability`;
+  factory-only vanilla BO variants are missing from `SOLVER_NAMES`. Confirm
+  intended compatibility before changing names/defaults.
+- `workflows/website.yml` is outside active Actions configuration and some CI
+  definitions target `master`; review separately before enabling deployment.
+
+## Experiment management and validation
+
+- Current and historical runners use different protocols and poli APIs. Specify
+  initialization, objective direction, budgets and result contracts before
+  unifying them. Record planned budgets, oracle versions, environment/revision,
+  timings and physical oracle calls; some are unavailable in existing artifacts.
+- Exact optimizer/RNG resumption is unverified. Observation NPZ files alone are
+  not resumable solver checkpoints. Preserve attempts and reject output collisions.
+- Integration tests can construct real objectives at collection. Separate their
+  selection from unit tests; confirm optional environments and LaMBO2 coverage.
+- Extend equation/numerical verification to the flow, diffusion and LSBO variants.
+  GP/acquisition and flow implementations contain duplicated code; extract only
+  demonstrated-equivalent pieces after checking trajectories and RNG behavior.
+- Legacy analysis uses hardcoded selections and import-time execution. Preserve
+  historical interpretation while improving reusable interfaces and multi-seed
+  comparisons. Never treat partial runs or duplicate seeds as independent,
+  full-budget replicates.

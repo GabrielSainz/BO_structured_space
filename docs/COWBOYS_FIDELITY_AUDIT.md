@@ -238,7 +238,7 @@ establish exact sampling under ongoing adaptation and finite chains.
   Machine-readable traces are in
   [`cowboys_fidelity.json`](verification/cowboys_fidelity.json).
 - The known Windows BLAS GP-fitting failure was neither rerun nor repaired.
-  See [migration verification](MIGRATION_VERIFICATION.md). The existing
+  See the [original verification evidence](verification/phase1.json). The existing
   [PMO oracle limitations](PMO_DIAGNOSTICS.md) also remain.
 - No claim is made about paper-score reproduction, corrected optimization
   trajectories, other latent dimensions or all seeds. Historical results and
