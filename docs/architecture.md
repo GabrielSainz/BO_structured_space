@@ -1,196 +1,94 @@
 # Repository architecture
 
-Phase 1 organizes existing research code without changing optimization behavior.
-The Python distribution and package remain `hdbo_benchmark` (version 1.0.0), using
-the existing `src/` layout. There is no new solver interface or experiment runner.
+`hdbo_benchmark` uses a `src/` package layout. Root `run.py` forwards to the
+canonical experiment CLI. Scientific implementations, older experiment
+protocols and import/serialization aliases have distinct roles.
 
-```text
-ROTLSC/
-  AGENTS.md, README.md
-  pyproject.toml, setup.cfg, requirements*.txt, tox.ini
-  environment*.yml, envs/       existing environment definitions
-  configs/README.md            index of actual configuration locations
-  src/
-    cowboys*.py, run.py        installed legacy module aliases
-    hdbo_benchmark/
-      solvers/                five local methods and registry
-      benchmarks/             poli loaders and representation transformations
-      generative_models/      VAE, AE, one-hot and diffusion components
-      experiments/            current CLI plus historical/training protocols
-      evaluation/             current local tables and iteration plots
-      results/                historical paper/website analysis source
-      utils/                  retained shared and domain utilities
-      data_preprocessing/     existing ordered Zinc conversion scripts
-      assets/                 packaged metadata and checkpoints
-      sanity_checks/          existing BO demonstration
-  scripts/experiments/         existing shell sweeps
-  scripts/slurm/               SLURM entry points
-  tests/                      structural and existing integration tests
-  docs/                       audit, architecture, migration evidence, future work
-  data/                       existing datasets/checkpoints/PDBs/embeddings
-  results/                    generated optimization outputs (ignored)
-  reports/                    generated figures
-  logs/, wandb/, oracle/       existing local runtime artifacts
-  run.py                      main convenience launcher
-```
+## Canonical modules
 
-The main root launcher and installed aliases are compatibility boundaries.
-The subsequent [corrected COWBOYS baseline](COWBOYS_IMPLEMENTATION.md) changes
-its sampling coordinates, observation tracking and default chain count under
-explicit user authorization; the original Phase 1 behavior-preservation claims
-below describe that historical migration.
-Redundant root method, shell, report and test launchers were removed in the
-[post-migration cleanup](CLEANUP.md). No scientific implementations were removed.
+| Responsibility | Location |
+| --- | --- |
+| Local methods and upstream solver factory | `src/hdbo_benchmark/solvers/` and `registry.py` |
+| poli problems and representation adapters | `src/hdbo_benchmark/benchmarks/` |
+| VAEs, protein AE, one-hot and diffusion components | `src/hdbo_benchmark/generative_models/` |
+| Current CLI | `src/hdbo_benchmark/experiments/run.py` |
+| Historical benchmark and training protocols | Other directories under `experiments/` |
+| Offline molecular metrics, plots and tables | `src/hdbo_benchmark/evaluation/` |
+| Historical analysis | Package `results/`, `utils/results/`, `utils/visualization/` |
+| Shared GP fitting | `utils/experiments/training_gps.py` |
+| Objective/iteration/prediction recording | `utils/logging/` |
+| Sweeps and scheduler entry points | Root `scripts/experiments/` and `scripts/slurm/` |
+| Environment and configuration index | Root `configs/README.md` |
 
-## Methods and scientific components
+Locations without a full path are relative to `src/hdbo_benchmark/`; scripts
+and configuration paths marked root are relative to the repository.
 
-| Solver key | Canonical implementation | Components kept together |
-|---|---|---|
-| `cowboys` | `solvers/cowboys.py:COWBOYS` | GP/fingerprints, acquisition, MCMC proposals, diagnostics |
-| `cowboys_flow` | `solvers/cowboys_flow.py:COWBOYSFlow` | Flow layers, weighted proposal, mixture, GP and diagnostics |
-| `cowboys_flow_2` | `solvers/cowboys_flow_2.py:COWBOYSFlow` | Separate flow variant and proposal diagnostics |
-| `cowboys_diffusion` | `solvers/cowboys_diffusion.py:COWBOYSDiffusion` | Diffusion sampling/guidance, critic, GP and acquisition |
-| `lsbo` | `solvers/latent_space_bo.py:LatentSpaceBayesianOptimization` | Latent-space GP/EI and acquisition optimization |
+| Solver key | Canonical implementation |
+| --- | --- |
+| `cowboys` | `solvers/cowboys.py:COWBOYS` |
+| `cowboys_flow` | `solvers/cowboys_flow.py:COWBOYSFlow` |
+| `cowboys_flow_2` | `solvers/cowboys_flow_2.py:COWBOYSFlow` |
+| `cowboys_diffusion` | `solvers/cowboys_diffusion.py:COWBOYSDiffusion` |
+| `lsbo` | `solvers/latent_space_bo.py:LatentSpaceBayesianOptimization` |
 
-`solvers/registry.py` retains all existing solver names, environment mapping and
-constructor settings. Directed evolution, hill climbing, genetic algorithm,
-CMA-ES, random/coordinate LineBO, BAxUS, TuRBO, Hvarfner BO, ALEBO, Bounce, PR,
-SAASBO and LaMBO2 are integrations with upstream `poli_baselines`, not new local
-implementations. The factory also has `vanilla_bo` and
-`vanilla_bo_with_lognormal_prior` branches absent from `SOLVER_NAMES`; that
-pre-existing inconsistency is retained. `utils/ax/` and
-`utils/latent_space_solver.py` retain older adapters.
+The registry also integrates upstream `poli_baselines` methods. GP/acquisition
+and flow components remain within their methods; the two flow variants are
+distinct. Plotting aliases `dgbo` and `nflow3` mean diffusion and flow variant 2.
 
-The plotting aliases `dgbo` and `nflow3` refer to `cowboys_diffusion` and
-`cowboys_flow_2`, respectively; they are not additional local implementations.
+## Execution and scientific behavior
 
-GP fitting and acquisition remain inside methods where they already lived.
-`utils/experiments/training_gps.py` is the existing shared exact-GP helper;
-normalization remains in `utils/experiments/normalization.py`. A separate
-`models/` or `acquisition/` package would require internal extraction and is
-deferred. The two flow files intentionally remain distinct.
+The runner loads the poli objective and supervised initialization, attaches its
+observer, loads an existing representation model when needed, transforms the
+problem, constructs the solver and records progress. PMO uses SELFIES and ten
+initial molecules. Budgets, seeds and objective conventions belong to their
+existing loaders/runners; older experiment entry points retain older protocols.
 
-`generative_models/` contains molecular/Mario VAEs, an RNN VAE, the historical
-`vae_selfies-old.py`, protein autoencoder/ESM support, one-hot representation,
-latent diffusion and its dataset/cache helpers. Factories choose existing
-checkpoints. Flow proposal models remain local to their solver files.
+Corrected COWBOYS samples in raw VAE coordinates, fits its GP to actually
+evaluated structures, selects canonically novel molecules and keeps the
+incumbent threshold fixed. Its current default is one chain, 100 minimum pCN
+steps and a 50,000-step cap, explicitly raised from 10,000 on 2026-11-20.
+Diagnostic objective calls are disabled by default. Read
+[COWBOYS_IMPLEMENTATION.md](COWBOYS_IMPLEMENTATION.md) before changing these
+settings; [PMO_DIAGNOSTICS.md](PMO_DIAGNOSTICS.md) explains oracle/runtime limits.
 
-## Evaluation and execution dependencies
+## Outputs and resources
 
-```mermaid
-flowchart TD
-    CLI[experiments.run / root run.py] --> B[benchmarks.load_problems]
-    B --> Poli[poli objectives and data packages]
-    B --> Obs[utils.logging observers]
-    CLI --> G[utils.experiments.load_generative_models]
-    G --> GM[generative_models and existing checkpoints]
-    CLI --> T[benchmarks.problem_transformations]
-    T --> GM
-    CLI --> R[solvers.registry]
-    R --> L[local solvers]
-    R --> U[upstream poli_baselines]
-    CLI --> Metrics[utils.logging iteration metrics]
-    CLI --> Outputs[root results/]
-    Outputs --> Analysis[evaluation / historical analysis]
-```
+- COWBOYS writes `results/cowboys/<sufix>/` with best-performance NPY, aligned
+  history NPZ, status/iteration JSON and available GP prediction sidecars.
+- Other non-diffusion methods use
+  `results/new_vae_10_chain_100_steps_with_stoch_sampling_<sufix>/`; diffusion
+  uses `results/diffusion/` with parameter-derived subdirectories.
+- Offline exports live in a selected run directory's `metrics/`. See
+  [MOLECULAR_METRICS.md](MOLECULAR_METRICS.md) for provenance, schema, missing
+  data and aggregation rules. Preflights are excluded from ordinary discovery.
+- Root `results/`, `logs/`, `wandb/`, generated report directories and local
+  scratch/agent files are ignored. Package `src/hdbo_benchmark/results/` is
+  analysis source and must remain tracked.
+- Datasets/checkpoints are in root `data/` and package `assets/`. Molecular VAE
+  lookup checks `data/trained_models/training_vae_on_zinc_250k` before package
+  assets. Preserve bytes, precedence and legacy serialized class references.
 
-The current CLI loads a poli problem and its initial supervised data, attaches
-the existing evaluation budget/observer, optionally loads the representation
-model and transforms the black box to continuous space, then constructs the
-selected solver. It attaches the existing VAE/bounds and diffusion checkpoint
-when supported. It calls `step()` with periodic saves where available, otherwise
-uses the existing `solve()` branch. This sequence and exception handling are
-unchanged.
+## Compatibility and checks
 
-PMO uses SELFIES and ten initial molecules in the existing loader. The subsequent
-[objective audit](PMO_DIAGNOSTICS.md) adds TDC error propagation: in-process
-scalar oracle calls use the one-item list API so evaluator failures are visible.
-Successful scores and evaluation counts are preserved. TDC fallback package
-metadata also supports repeated initialization in one process. JNK3/GSK3β
-remain blocked by classifier/runtime compatibility in the current environment.
-Other loader
-branches cover `rfp_rasp`, `rfp_foldx_stability`, Ehrlich tiny/small/large and
-`pest_control_equivalent`. Initialization counts and objective conventions stay
-in the loader, not in a new config layer. The default CLI function string remains
-`foldx_stability`, which does not match that loader key; it is documented debt.
+Edit canonical package modules, not forwarding aliases. Root `run.py`, installed
+aliases under `src/`, and old loader/transform module aliases remain compatibility
+boundaries. Historical training/benchmark commands are not lightweight checks.
+Submit actual SLURM files from the repository root so their headers are read.
 
-Run from the repository root after an editable install:
+Use the established Python 3.10 environment. On this Windows machine, Conda
+activation is necessary: `conda run -n hdbo_benchmark ...` passed a real bounded
+COWBOYS check, while invoking its Python directly from the base shell could
+fail in BLAS/threadpool handling. The original comparison is recorded in
+[verification/phase1.json](verification/phase1.json); the successful corrected
+check is documented in [COWBOYS_IMPLEMENTATION.md](COWBOYS_IMPLEMENTATION.md).
+Clean-install and full historical serialization guarantees remain open.
 
 ```bash
+python -m unittest tests.test_structure -v
 python run.py --help
-python -m hdbo_benchmark.experiments.run --help
-python -m hdbo_benchmark.evaluation.plot_iteration_metrics --help
 python -m hdbo_benchmark.evaluation --help
 ```
 
-These two experiment CLI forms execute the same implementation. Existing
-benchmark-specific `run.py`, compiler and batch files remain in `experiments/`;
-they are independent historical protocols and may rely on older poli APIs.
-Training entry points remain present and must not be run as structural checks.
-
-## Storage and paths
-
-The current runner uses the working-directory-relative output root:
-
-- Corrected COWBOYS: `results/cowboys/<sufix>/`, including original observed
-  structures and sampler/checkpoint provenance in its saved artifacts.
-- Other non-diffusion: `results/new_vae_10_chain_100_steps_with_stoch_sampling_<sufix>/`.
-- Diffusion: `results/diffusion/<existing parameter-derived directory>/`.
-- Filenames include `<solver_name>_<function_name>_<seed>` with `.npy`,
-  `_history.npz`, `_iteration_results.json` and `_status.json`, according to the
-  existing saving branches. Diagnostic objective calls now require the explicit
-  `--evaluate-top-candidate-objectives` option; they are disabled by default.
-
-The current plotting CLI reads root `results/` and writes
-`reports/iteration_plots/` by default. The table module keeps its hardcoded
-selection and import-time reporting behavior. Historical runners/analysis may
-use `data/benchmark_on_*`, W&B, `data/results_cache/`, package `results/` source,
-or `reports/figures/`. These formats were not unified.
-
-The offline [molecular metric exporter](MOLECULAR_METRICS.md) extends `evaluation/`
-with an adapter for existing COWBOYS checkpoints, prefix metrics, run JSON
-validation, and independent-run aggregation/plots. `scripts/experiments/run.sh`
-has one additive post-run export command scoped to its fresh output directory.
-Solver implementations, optimization invocations and legacy plots are unchanged.
-The runner also attaches a pre-oracle GP prediction recorder for newly started
-COWBOYS processes and saves an additive `_predictions.json` sidecar. The recorder
-passes the selected candidate through unchanged and preserves RNG states.
-New JSON/tables/figures live under `metrics/` in the selected result directory;
-read `summary.json` for the small overview and `evaluations.csv` for observed
-scores paired with predictions. Large ranked-candidate diagnostics are linked
-from `run.json` as a separate lossless `diagnostics.json`.
-
-`utils/constants.py` still computes repository paths from its existing depth.
-Some other modules independently do the same. Molecular VAE lookup still checks
-`data/trained_models/training_vae_on_zinc_250k` before package assets; checkpoint
-precedence and bytes are unchanged. Data loaders, preprocessing modules and
-resource files were not relocated. Wheels can contain packaged assets, but
-repository-relative external data remains a limitation for standalone installs.
-
-## Compatibility and import boundaries
-
-- `src/cowboys*.py` and `src/run.py`, declared in `setup.cfg`, preserve old
-  import names in installed distributions. Root `run.py` remains for scripts and
-  convenience. Redundant root COWBOYS aliases have been removed.
-- Old loader/transform paths still alias their canonical modules in
-  `sys.modules`, preserving private helpers and shared module state. Internal
-  code uses canonical imports.
-- Invoke local analysis with `python -m hdbo_benchmark.evaluation.<module>` and
-  integration tests from `tests/test_main_entry_point.py`. Their old report/root
-  launchers have been removed.
-- Invoke sweep scripts directly under `scripts/experiments/` and submit SLURM
-  files directly under `scripts/slurm/`. Continue using the repository root as
-  the working directory; command settings and scheduler directives are intact.
-- `solvers` lazily resolves its two existing exported classes. Importing package
-  namespaces does not load PyTorch/poli/plotting. Importing an actual solver still
-  needs its original scientific dependencies; broad generative-model imports
-  and legacy import-time side effects are not rewritten.
-- Legacy pickle class references can resolve through aliases. New serialized
-  classes use canonical package names; arbitrary old object payloads and external
-  scripts depending on `__file__` have not been exhaustively tested.
-
-See [verification](MIGRATION_VERIFICATION.md) for tested boundaries and known
-environment/build limitations. Add future methods to `solvers/` and register
-them explicitly after a separately scoped scientific change. Add benchmark
-adapters under `benchmarks/`, current analysis under `evaluation/`, and preserve
-historical protocols unless their migration is explicitly in scope.
+Integration tests may execute real objectives and require optional dependencies;
+select them deliberately. Current unresolved work is in
+[TECHNICAL_DEBT.md](TECHNICAL_DEBT.md).

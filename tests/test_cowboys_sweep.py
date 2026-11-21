@@ -32,11 +32,10 @@ class SweepSelectionTests(unittest.TestCase):
         return result
 
     def test_missing_runs_are_exact_pairs_without_cartesian_expansion(self):
-        result = self.dry_run(RUNS_FILE="configs/cowboys_missing_20261120.tsv")
+        result = self.dry_run(RUNS_FILE="configs/cowboys_pending.tsv")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.splitlines(), [
-            "task\tseed", "drd2_docking\t2", "scaffold_hop\t1",
-            "ranolazine_mpo\t4", "albuterol_similarity\t1",
+            "task\tseed", "albuterol_similarity\t1",
             "albuterol_similarity\t2", "albuterol_similarity\t3",
             "albuterol_similarity\t4", "albuterol_similarity\t5",
         ])
@@ -50,7 +49,7 @@ class SweepSelectionTests(unittest.TestCase):
         ])
 
     def test_ambiguous_or_duplicate_plans_are_rejected_before_launch(self):
-        result = self.dry_run(RUNS_FILE="configs/cowboys_missing_20261120.tsv", SEEDS="1")
+        result = self.dry_run(RUNS_FILE="configs/cowboys_pending.tsv", SEEDS="1")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Use RUNS_FILE alone", result.stderr)
         with tempfile.TemporaryDirectory() as folder:

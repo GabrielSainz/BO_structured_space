@@ -22,11 +22,23 @@ build/
 venv/
 env/
 
+# Local agent instructions, settings and scratch work
+AGENTS.md
+AGENTS.override.md
+CLAUDE.md
+GEMINI.md
+.codex/
+.claude/
+.agents/
+*.local.md
+/tmp/
+
 # MacOS stuff
 .DS_Store
 
 # Experiment artifacts and data
 wandb/
+/logs/
 data/small_molecule_datasets/raw/
 data/small_molecule_datasets/processed/*.npz
 data/small_molecule_datasets/processed/*.pkl
