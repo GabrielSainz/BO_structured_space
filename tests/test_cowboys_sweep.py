@@ -36,8 +36,7 @@ class SweepSelectionTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.splitlines(), [
             "task\tseed", "albuterol_similarity\t1",
-            "albuterol_similarity\t2", "albuterol_similarity\t3",
-            "albuterol_similarity\t4", "albuterol_similarity\t5",
+            "albuterol_similarity\t2",
         ])
 
     def test_existing_function_seed_cartesian_order_is_preserved(self):

@@ -2,12 +2,14 @@
 
 ## Current consolidated results (2026-11-21)
 
-The November 17/19 experiment folders and November 20 cap-50,000 reruns are
+The November 17/19 experiment folders and November 20/21 cap-50,000 reruns are
 consolidated in `results/cowboys/merged_20261121/`. Its `RUN_SUMMARY.md`,
 `run_summary.csv`, `attempts.csv` and `merge_manifest.json` identify the selected
 whole attempt for every task/seed and retain failed/interrupted-run provenance.
-The selected working set has 20 completed and five partial runs. Seventeen
-completed runs use a 10,000-step sampling cap and three use 50,000; this is a
+The selected working set has 23 completed and two partial runs. Only albuterol
+seeds 1 and 2 remain incomplete, after 281 and 197 BO steps respectively; both
+failed at the 50,000-step sampling cap. Seventeen completed runs use a
+10,000-step sampling cap and six use 50,000; this is a
 progress collection, not a homogeneous five-seed algorithm comparison. Use
 `configuration_summary.csv` for cap-separated completed-run statistics.
 
@@ -17,7 +19,10 @@ archive `results/cowboys/_archive/cleanup_20261121.zip`. Its internal manifest m
 every original path to SHA256-addressed contents, deduplicating byte-identical
 copies. Historical generated-result paths quoted below refer to that snapshot;
 the tracked verification JSON files in `docs/verification/` remain in place.
-`results/cowboys/merged_20261121/restore_sources.py` can reconstruct the original
+The later albuterol source folder and superseded merged artifacts are preserved
+in `results/cowboys/_archive/albuterol_update_20261121_085359.zip` with the same
+self-contained recovery format.
+`results/cowboys/merged_20261121/restore_sources.py --archive <archive.zip>` can reconstruct the original
 source tree into a fresh directory. `cleanup_result.json` records the cleanup,
 and `verification.json` records archive/selected-copy and metric validation.
 The canonical `metrics/<run-stem>/` exports are regenerated against the new
