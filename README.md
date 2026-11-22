@@ -98,7 +98,9 @@ fresh output directories and remaining classifier limitations are explained in
 Flow, diffusion and LSBO launchers are described
 in [scripts/README.md](scripts/README.md). Use Git Bash/WSL on Windows for shell
 scripts. Inspect budgets before launching sweeps. SLURM batch files are under `scripts/slurm/`; submit them from the repository
-root. Historical package experiment entry points retain their locations.
+root. See the [Hendrix smoke test and output paths](scripts/README.md#first-job-on-hendrix)
+for a single CPU submission. Historical package experiment entry points retain
+their locations.
 
 ## Structure and outputs
 
