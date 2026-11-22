@@ -156,6 +156,8 @@ python -m hdbo_benchmark.evaluation aggregate --results-dir results/cowboys/<RUN
 
 See [offline molecular metrics](docs/MOLECULAR_METRICS.md) for the artifact audit,
 task-specific hit thresholds, missing data, AUC definitions and comparison guards.
+For a separate five-task, five-seed read-only report with thirteen core figures,
+see [COWBOYS experiment analysis](docs/COWBOYS_ANALYSIS.md).
 Within each exported run folder, `summary.json` provides the small overview and
 `evaluations.csv` pairs actual scores with available pre-evaluation GP means,
 uncertainties and improvement diagnostics. `run.json` retains all observations

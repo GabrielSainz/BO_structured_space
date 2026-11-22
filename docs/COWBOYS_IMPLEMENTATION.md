@@ -72,11 +72,12 @@ artifacts remain unchanged. Treat these as changed-cap experiments, and retain
 the original failed/interrupted attempts when reporting results. A larger cap
 does not guarantee successful completion.
 
-`configs/cowboys_pending.tsv` contains only albuterol seeds 1-5, the incomplete
-pairs in the November 21 consolidated results. Completed DRD2, scaffold hop and
-ranolazine pairs have been removed from the pending selection. These are fresh
-300-step runs, not resumptions of partial observation archives. Run from the
-repository root in PowerShell:
+`configs/cowboys_pending.tsv` contains only albuterol seeds 1 and 2. The other
+23 task/seed pairs completed 300 steps in the consolidated results. These two
+albuterol attempts still hit the 50,000-step sampling cap; restarting with the
+same settings may repeat the failure. The launcher starts fresh 300-step runs,
+not resumptions of partial observation archives. Run from the repository root
+in PowerShell:
 
 ```powershell
 Remove-Item Env:FUNCTIONS, Env:SEEDS, Env:DRY_RUN -ErrorAction SilentlyContinue

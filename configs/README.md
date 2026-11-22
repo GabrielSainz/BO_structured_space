@@ -13,7 +13,7 @@ duplicating settings or changing relative paths.
 | Additional requirements | [`../requirements.txt`](../requirements.txt), [`../requirements-dev.txt`](../requirements-dev.txt) | Root; overlaps with metadata remain technical debt |
 | Current experiment settings | [`../scripts/experiments/`](../scripts/experiments/) | `run.sh` uses the corrected COWBOYS setup; other historical launchers retain their settings |
 | COWBOYS paper reference | [`cowboys_paper_table1.json`](cowboys_paper_table1.json) | Table 1 task list, reported values, protocol and verified checkpoint digest; see [implementation notes](../docs/COWBOYS_IMPLEMENTATION.md) |
-| COWBOYS pending runs | [`cowboys_pending.tsv`](cowboys_pending.tsv) | Albuterol seeds 1-5 remain incomplete in the November 21 consolidated results. Pass as `RUNS_FILE` to `scripts/experiments/run.sh`; remove completed pairs after reviewing new results. |
+| COWBOYS pending runs | [`cowboys_pending.tsv`](cowboys_pending.tsv) | Only albuterol seeds 1 and 2 remain incomplete after the latest November 21 merge. Pass as `RUNS_FILE` to `scripts/experiments/run.sh`; remove completed pairs after reviewing new results. |
 | Scheduler settings | [`../scripts/slurm/`](../scripts/slurm/) | Submit from the repository root; original SLURM headers and arguments preserved |
 | CLI defaults | [`../src/hdbo_benchmark/experiments/run.py`](../src/hdbo_benchmark/experiments/run.py) | Click options and `_main`; retain the existing `--sufix` spelling |
 | Method defaults | [`../src/hdbo_benchmark/solvers/`](../src/hdbo_benchmark/solvers/) | Constructor defaults and `registry.py`; no extraction to config files |
