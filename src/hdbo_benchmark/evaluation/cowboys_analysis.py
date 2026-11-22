@@ -479,8 +479,8 @@ CORE = [
     ("01_best_so_far", "Optimization: best observed objective", [("current_best", "Best so far")], "Objective score (higher is better)", None),
     ("02_improvement_rate", "Optimization: strict record improvement rate", [("success_rolling", "Observed strict improvement")], "Fraction of selected evaluations", (0, 1)),
     ("03_nearest_previous_tanimoto_distance", "Search geography: selected-molecule novelty", [("nn_distance_rolling", "Logged NN distance")], "Logged count-fingerprint Tanimoto distance", (0, 1)),
-    ("04_generator_variety", "Search geography: candidate generator variety", [(GENERATOR[0] + "_rolling", "Unique within iteration"), (GENERATOR[1] + "_rolling", "Never decoded in prior iterations")], "Generated unique structures (count)", None),
-    ("05_top10_candidate_pool_size", "Search geography: available ranked shortlist", [(GENERATOR[-1] + "_rolling", "Eligible saved top-10 candidates")], "Truncated shortlist size (count)", (0, 10)),
+    ("04_generator_variety", "Search geography: variety among accepted MCMC moves", [(GENERATOR[0] + "_rolling", "Distinct accepted decodings this iteration"), (GENERATOR[1] + "_rolling", "Not accepted in earlier sampling iterations")], "Distinct molecules from accepted MCMC moves", None),
+    ("05_top10_candidate_pool_size", "Search geography: saved top-10 diagnostic", [(GENERATOR[-1] + "_rolling", "Saved eligible candidates (capped at 10)")], "Saved diagnostic count (selection uses full pool)", (0, 10)),
     ("06_top10_high_quality_diversity", "Search geography: diversity of top-10 evaluated molecules", [("top10_pairwise_distance", "Top-10 mean pairwise distance")], "ECFP4 bit Tanimoto distance (1 - similarity)", (0, 1)),
     ("07_high_quality_circles", "Search geography: chronological greedy dissimilar high-quality hits", [("circles", "#Circles proxy (delta = 0.4)")], "Accepted high-quality centers (cumulative count)", None),
     ("09_gp_rolling_rmse", "GP: online one-step-ahead prediction error", [("rmse_rolling", "RMSE on chosen molecules")], "RMSE (objective units)", None),
@@ -764,8 +764,25 @@ max(y-b,0). EI is the saved analytic LATENT Gaussian diagnostic, not the actual
 MC qLogEI acquisition. Ratios of sums use paired nonmissing EI/gain only.
 Unselected candidate scores/outcomes are never inferred from selection_score;
 saved top-10 candidates are not extra oracle evaluations or MCMC effective
-sample size. Generator counts describe structures decoded within/across sampling
-iterations, not evaluations or proposal rates with unknown denominators.
+sample size. They are a diagnostic view, not a top-10 restriction on selection.
+The generator counts describe distinct valid molecules from ACCEPTED MCMC
+moves; rejected proposal decodings are not counted. "New" compares against
+accepted decodings in earlier BO iterations within the run, not the evaluated
+history. The full eligible unique pool is saved separately as
+sample_unique_decoded_molecules_not_in_observed_history. Sampling runs at least
+100 attempted pCN steps and continues if no eligible molecule exists, up to the
+recorded cap; 100 is not a unique-candidate count. The GP qLogEI scores the full
+eligible pool and one molecule is oracle-evaluated. Acceptance/proposal counts
+were not recorded, so acceptance rates cannot be inferred.
+
+insights.md gives a plain-language walkthrough and three additional figures
+under figures/explainer/: all evaluated score counts (including initialization),
+seed-normalized early/middle/late score histograms, and record wins per 100
+evaluations. Score histograms use 25 task-specific equal-width bins shared by
+all stages; seed-stage percentages are normalized before means/sample SD.
+Initial points appear once, missing scores are excluded, and repeated evaluated
+observations retain multiplicity. All denominators and seed distributions are
+in tables/score_*.csv; simple metrics are in tables/plain_metrics_*.csv.
 
 Novelty bins are [0,.1), [.1,.2), [.2,.4), [.4,1.00001). Per-seed RMSE requires
 >=5 valid residuals to contribute to bin aggregate means/sample SD. CSV retains
@@ -797,6 +814,7 @@ def write_report(output, inventory, summary, task_summary, thresholds, diagnosti
     success_down = int((task_summary.last100_success_mean < task_summary.first100_success_mean).sum())
     pi_over = int((task_summary.last100_pi_mean > task_summary.last100_success_mean).sum())
     text = ["# COWBOYS experiment analysis", "",
+            "Start with [the plain-language guide and score histograms](insights.md) for candidate-selection definitions and simpler metrics.", "",
             f"Analyzed {len(summary)} unambiguous supported runs across {summary.task.nunique()} tasks. "
             f"{int((~supported.incomplete).sum())} completed the requested {diagnostics['planned_steps']}-step budget; "
             f"{int(supported.incomplete.sum())} are partial. {diagnostics['validation_error_count']} validation errors are recorded. "
@@ -825,8 +843,9 @@ def write_report(output, inventory, summary, task_summary, thresholds, diagnosti
     text += ["", "## 2. Search geography", "",
              "[P03 logged novelty](figures/core/03_nearest_previous_tanimoto_distance.png) · [P04 generator variety](figures/core/04_generator_variety.png) · "
              "[P05 shortlist](figures/core/05_top10_candidate_pool_size.png) · [P06 top-10 diversity](figures/core/06_top10_high_quality_diversity.png) · "
-             "[P07 high-quality centers](figures/core/07_high_quality_circles.png). Counts describe candidate generation separately from evaluated chemistry. "
-             "Shortlists are truncated to ten; they do not measure whole-chain mixing or effective sample size."]
+             "[P07 high-quality centers](figures/core/07_high_quality_circles.png). Generator counts describe distinct accepted MCMC decodings, excluding rejected moves. "
+             "New-to-sampling memory differs from unevaluated history. The saved top-10 ranking is diagnostic; selection uses the full eligible pool. "
+             "Its count does not measure whole-chain mixing or effective sample size."]
     for _, r in task_summary.iterrows():
         th = thresholds[r.task]
         text.append(f"- **{r.task}**: mean logged novelty first/last 100 {format_stat(r, 'first100_nn_distance')} / {format_stat(r, 'last100_nn_distance')}; "
@@ -1015,6 +1034,8 @@ def analyze(input_root, output_root, tasks=None, seeds=None, planned_steps=300, 
         save_table(pd.concat([summary[seed_cols], task_summary[task_cols]], ignore_index=True), output, name)
     save_table(bins, output, "05_gp_novelty_bins")
     plots = make_plots(data, inventory, bins, summary, output, task_order, planned_steps, include_optional)
+    from .cowboys_explainer import create_explainer
+    explainer = create_explainer(data, runs, output, task_order, TITLES)
     changed = [p for p, before in source_hashes.items() if digest_file(Path(p)) != before]
     diagnostics = {"input_root": str(source), "output_root": str(output), "planned_steps": planned_steps,
                    "task_order": task_order, "intended_seeds": seed_order, "thresholds": thresholds,
@@ -1023,7 +1044,7 @@ def analyze(input_root, output_root, tasks=None, seeds=None, planned_steps=300, 
                    "runs": failures, "discovery_errors": discovery_errors, "ignored_preflights": ignored,
                    "validation_error_count": sum(len(r["errors"]) for r in failures) + len(discovery_errors),
                    "source_sha256": source_hashes, "source_files_unchanged": not changed,
-                   "changed_sources": changed, "plots": plots, "common_auc_horizons": horizons,
+                   "changed_sources": changed, "plots": plots, "explainer": explainer, "common_auc_horizons": horizons,
                    "sampling_cap_counts": inventory.max_sampling_steps.value_counts().to_dict(),
                    "versions": {"numpy": np.__version__, "pandas": pd.__version__}}
     write_json(output / "diagnostics.json", diagnostics)

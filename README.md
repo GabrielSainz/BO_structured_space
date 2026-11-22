@@ -43,10 +43,21 @@ For molecular PMO objectives, the existing chemistry setup is:
 
 ```bash
 conda install -c conda-forge "rdkit<2024.03" -y
-python -m pip install --upgrade PyTDC "huggingface_hub<1"
+python -m pip install --upgrade PyTDC "huggingface_hub<1" "setuptools==80.10.2"
 python -c "import rdkit; print(rdkit.__version__)"
-python -c "from tdc import Oracle; print('tdc ok')"
+python -c '
+from hdbo_benchmark.utils.tdc_compat import patch_broken_tdc_chem_utils
+
+patch_broken_tdc_chem_utils()
+from tdc import Oracle
+
+print("PyTDC import OK")
+'
 ```
+
+PyTDC 1.1.14 imports `pkg_resources`, which setuptools removed in version 82.
+The runtime pin above keeps that import available.
+[Setuptools removal notice](https://setuptools.pypa.io/en/stable/deprecated/pkg_resources.html)
 
 These are retained setup instructions, not a newly validated dependency lock.
 The build system declares `setuptools<=68`; a local no-isolation build with
@@ -97,8 +108,9 @@ fresh output directories and remaining classifier limitations are explained in
 [COWBOYS_IMPLEMENTATION.md](docs/COWBOYS_IMPLEMENTATION.md).
 Flow, diffusion and LSBO launchers are described
 in [scripts/README.md](scripts/README.md). Use Git Bash/WSL on Windows for shell
-scripts. Inspect budgets before launching sweeps. SLURM batch files are under `scripts/slurm/`; submit them from the repository
-root. Historical package experiment entry points retain their locations.
+scripts. Inspect budgets before launching sweeps. Slurm batch files are under
+`scripts/slurm/`. Submit them from the repository root. Historical package
+experiment entry points retain their locations.
 
 ## Structure and outputs
 

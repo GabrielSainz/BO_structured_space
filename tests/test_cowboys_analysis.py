@@ -192,7 +192,8 @@ class AnalysisTests(unittest.TestCase):
             source.mkdir()
             self.fixture(source)
             before = {p: digest_file(p) for p in source.iterdir()}
-            with patch("hdbo_benchmark.evaluation.cowboys_analysis.make_plots", return_value=[]):
+            with patch("hdbo_benchmark.evaluation.cowboys_analysis.make_plots", return_value=[]), \
+                    patch("hdbo_benchmark.evaluation.cowboys_explainer.create_explainer", return_value={}):
                 result = analyze(source, root / "report", planned_steps=3)
             inventory = pd.read_csv(root / "report" / "run_inventory.csv")
             self.assertEqual(len(inventory), 5)
@@ -203,7 +204,8 @@ class AnalysisTests(unittest.TestCase):
             report = (root / "report" / "report.md").read_text()
             self.assertIn("selection-biased", report)
             self.assertIn("future experiment", report)
-            with patch("hdbo_benchmark.evaluation.cowboys_analysis.make_plots", return_value=[]):
+            with patch("hdbo_benchmark.evaluation.cowboys_analysis.make_plots", return_value=[]), \
+                    patch("hdbo_benchmark.evaluation.cowboys_explainer.create_explainer", return_value={}):
                 analyze(source, root / "filtered", tasks=["test_task"], seeds=[1], planned_steps=3)
             self.assertEqual(len(pd.read_csv(root / "filtered" / "run_inventory.csv")), 1)
 
