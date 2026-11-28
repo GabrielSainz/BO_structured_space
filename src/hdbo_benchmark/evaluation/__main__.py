@@ -7,8 +7,9 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    export = commands.add_parser("export", help="Export the selected COWBOYS checkpoint directory")
+    export = commands.add_parser("export", help="Export molecular runner checkpoints")
     export.add_argument("--results-dir", type=Path, required=True)
+    export.add_argument("--solver", choices=("cowboys", "afgg_seqflow"), default="cowboys")
     export.add_argument("--recursive", action="store_true", help="Explicitly include child experiment groups, excluding preflight")
     export.add_argument("--planned-bo-steps", type=int, help="Known planned budget; never inferred from final horizon")
     export.add_argument("--task-config", type=Path, help="Task-keyed thresholds/direction/oracle metadata JSON")
@@ -33,7 +34,8 @@ def main():
             from .metric_io import read_json
             config = read_json(args.task_config) if args.task_config else None
             manifest = export_directory(args.results_dir, recursive=args.recursive,
-                                        task_configs=config, planned_bo_steps=args.planned_bo_steps)
+                                        task_configs=config, planned_bo_steps=args.planned_bo_steps,
+                                        solver=args.solver)
             print(f"Exported {len(manifest['runs'])} run(s); {len(manifest['issues'])} issue(s). "
                   f"Manifest: {args.results_dir / 'metrics/export_manifest.json'}")
             if manifest["issues"]:

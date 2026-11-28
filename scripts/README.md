@@ -28,3 +28,7 @@ function, solver, dimensions, iterations, tag and environment arguments as
 before. Their `#SBATCH` directives and working-directory assumptions are
 unchanged. Older benchmark-specific batch and compiler scripts remain beside
 their protocols in `src/hdbo_benchmark/experiments/`.
+
+`scripts/slurm/hendrix_afgg.sh` runs sequential AFGG with SeqFlow on one GPU
+per task. The [AFGG protocol](../docs/AFGG_SEQFLOW.md) gives separate smoke and
+five-task array commands.

@@ -49,6 +49,7 @@ from hdbo_benchmark.utils.logging.gp_predictions import (
 )
 
 ITERATION_METRIC_SOLVERS = {
+    "afgg_seqflow",
     "cowboys",
     "cowboys_flow",
     "cowboys_flow_2",
@@ -70,8 +71,8 @@ def _build_output_dir(
     sufix: str,
     diffusion_config: dict[str, float | int | str | None],
 ) -> Path:
-    if solver_name == "cowboys":
-        return Path("./results/cowboys") / sufix
+    if solver_name in {"cowboys", "afgg_seqflow"}:
+        return Path("./results") / solver_name / sufix
     if solver_name != "cowboys_diffusion":
         return Path(f"./results/new_vae_10_chain_100_steps_with_stoch_sampling_{sufix}")
 
@@ -290,6 +291,9 @@ def _main(
     save_iteration_results: bool = True,
     checkpoint_every: int = 10,
     evaluate_top_candidate_objectives: bool = False,
+    afgg_root: Path | None = None,
+    afgg_nfbo_root: Path | None = None,
+    afgg_checkpoint: Path | None = None,
 ):
     checkpoint_every = max(1, int(checkpoint_every))
 
@@ -324,6 +328,24 @@ def _main(
 
     seed_python_numpy_and_torch(seed)
 
+    problem_kwargs, afgg_solver_kwargs = {}, {}
+    if solver_name == "afgg_seqflow":
+        from hdbo_benchmark.solvers.afgg_seqflow import SeqFlowReference
+        from hdbo_benchmark.utils.constants import DEVICE
+
+        if evaluate_top_candidate_objectives:
+            raise click.UsageError("AFGG metrics use the budgeted objective observations and GP candidate scores")
+        output_dir = _build_output_dir(solver_name, sufix, {})
+        output_stem = f"{solver_name}_{function_name}_{seed}"
+        if any(output_dir.glob(f"{output_stem}.*")) or any(output_dir.glob(f"{output_stem}_*")):
+            raise FileExistsError(f"AFGG run artifacts already exist in {output_dir}; use a fresh --sufix")
+        reference = SeqFlowReference(afgg_root, afgg_nfbo_root, afgg_checkpoint, DEVICE)
+        initial_smiles, initial_selfies, initial_latents = reference.initial_design(seed)
+        n_dimensions = reference.flow.seq_len * reference.flow.zsize
+        problem_kwargs["initial_smiles"] = initial_smiles
+        afgg_solver_kwargs.update(reference=reference, initial_selfies=initial_selfies,
+                                 initial_latents=initial_latents)
+
     # Setting the observer configuration
     observer_config = ObserverConfig(
         experiment_name="hdbo_benchmark_results",
@@ -345,6 +367,7 @@ def _main(
         max_iter=max_iter,
         set_observer=True,
         observer_config=observer_config,
+        **problem_kwargs,
     )
     print(problem)
 
@@ -393,6 +416,7 @@ def _main(
         problem=problem,
         seed=seed,
         **diffusion_solver_kwargs,
+        **afgg_solver_kwargs,
     )
 
 
@@ -520,6 +544,9 @@ def _main(
 @click.option("--tag", type=str, default="default")
 @click.option("--sufix", type=str, default="default")
 @click.option("--diffusion-checkpoint-path", type=str, default=None)
+@click.option("--afgg-root", type=click.Path(path_type=Path, file_okay=False), envvar="AFGG_ROOT")
+@click.option("--afgg-nfbo-root", type=click.Path(path_type=Path, file_okay=False), envvar="NFBO_ROOT")
+@click.option("--afgg-checkpoint", type=click.Path(path_type=Path, dir_okay=False), envvar="AFGG_SEQFLOW_CKPT")
 @click.option("--num-candidates", type=int, default=None)
 @click.option("--distillation-n", type=int, default=None)
 @click.option("--guidance-scale", type=float, default=None)
@@ -561,6 +588,9 @@ def main(
     save_iteration_results: bool,
     checkpoint_every: int,
     evaluate_top_candidate_objectives: bool,
+    afgg_root: Path | None,
+    afgg_nfbo_root: Path | None,
+    afgg_checkpoint: Path | None,
 ):
     _main(
         function_name,
@@ -585,6 +615,9 @@ def main(
         save_iteration_results,
         checkpoint_every,
         evaluate_top_candidate_objectives,
+        afgg_root,
+        afgg_nfbo_root,
+        afgg_checkpoint,
     )
 
 

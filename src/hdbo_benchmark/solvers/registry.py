@@ -30,6 +30,7 @@ SOLVER_NAMES = [
     "cowboys_diffusion",
     "cowboys_flow",
     "cowboys_flow_2",
+    "afgg_seqflow",
 ]
 
 SOLVERS_THAT_DONT_ALLOW_CUSTOM_INPUTS = [
@@ -43,6 +44,7 @@ DISCRETE_SPACE_SOLVERS = [
     "bounce",
     "lambo2",
     "genetic_algorithm",
+    "afgg_seqflow",
 ]
 
 CONTINUOUS_SPACE_SOLVERS = [
@@ -63,6 +65,7 @@ SOLVER_NAME_TO_ENV = {
     "cowboys_diffusion": "hdbo_benchmark",
     "cowboys_flow": "hdbo_benchmark",
     "cowboys_flow_2": "hdbo_benchmark",
+    "afgg_seqflow": "hdbo_benchmark",
     "vanilla_bo_hvarfner": "hdbo_ax",
     "alebo": "hdbo_alebo",
     "bounce": "hdbo_bounce",
@@ -289,6 +292,10 @@ def load_solver_class(
                 }
             )
             return COWBOYSDiffusion, solver_kwargs
+        case "afgg_seqflow":
+            from hdbo_benchmark.solvers.afgg_seqflow import AFGGSeqFlow
+
+            return AFGGSeqFlow, solver_kwargs
         case "cowboys_flow":
             from hdbo_benchmark.solvers.cowboys_flow import COWBOYSFlow
 

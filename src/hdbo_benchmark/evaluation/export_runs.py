@@ -1,10 +1,10 @@
-"""Self-contained offline run.json export over existing COWBOYS results."""
+"""Self-contained offline run.json export over molecular solver results."""
 
 import importlib.metadata
 import platform
 from pathlib import Path
 
-from .cowboys_artifacts import load_cowboys
+from .cowboys_artifacts import MOLECULAR_SOLVERS, load_molecular_checkpoint
 from .metric_io import digest_json, display_path, io_path, read_json, write_json
 from .molecular_metrics import FINGERPRINT, HITS, QUALITY, compute_metrics, finite, normalized_auc
 from .prediction_metrics import join_predictions, prediction_summary
@@ -55,7 +55,7 @@ def _iteration_observations(iteration, saved_config, n_initial, direction):
 
 
 def build_run(status_path, *, task_config=None, planned_bo_steps=None):
-    artifact = load_cowboys(status_path)
+    artifact = load_molecular_checkpoint(status_path)
     status, warnings = artifact["status"], artifact["warnings"]
     config = {} if task_config is None else task_config
     if not isinstance(config, dict):
@@ -70,6 +70,8 @@ def build_run(status_path, *, task_config=None, planned_bo_steps=None):
     if planned is not None and (not isinstance(planned, int) or isinstance(planned, bool) or planned < 0):
         raise ValueError("bo_steps_planned must be a nonnegative integer")
     saved_config = status.get("solver_configuration", {})
+    solver = status["solver_name"]
+    initialization_policy = config.get("initialization_policy") or saved_config.get("initialization_policy")
     iteration = artifact["iterations"] or {}
     n_initial = status.get("initial_history_size")
     batch = saved_config.get("batch_size", iteration.get("batch_size"))
@@ -126,7 +128,7 @@ def build_run(status_path, *, task_config=None, planned_bo_steps=None):
         "oracle_version": "Not recorded in original artifacts" if not config.get("oracle_version") else None,
         "optimization_environment": "Historical git revision/dependency snapshot not recorded",
         "initial_design_id": "No logged initialization set identifier; content hash supplied separately",
-        "initialization_policy": "Original initialization sampling policy not logged" if not config.get("initialization_policy") else None,
+        "initialization_policy": "Original initialization sampling policy not logged" if not initialization_policy else None,
         "approx_circles": "Optional approximation not implemented",
     }
     if theta is None:
@@ -182,7 +184,8 @@ def build_run(status_path, *, task_config=None, planned_bo_steps=None):
                    and observation["canonical_smiles"] is not None]
         if len(matches) == 1:
             observation["recorded_acquisition"] = {"selection_score": matches[0].get("selection_score"),
-                "convention": "qLogExpectedImprovement" if saved_config.get("implementation") == "cowboys_corrected_pcn_v1" else "unspecified_selection_score",
+                "convention": ("qLogExpectedImprovement" if saved_config.get("implementation") == "cowboys_corrected_pcn_v1"
+                               else saved_config.get("selection_acquisition", "unspecified_selection_score")),
                 "source": "iteration top_candidate_diagnostics matched by canonical identity; no GP recomputation"}
     prediction_count = join_predictions(evaluations, artifact.get("predictions"), warnings)
     if prediction_count:
@@ -194,7 +197,7 @@ def build_run(status_path, *, task_config=None, planned_bo_steps=None):
         "schema_version": "1.0.0", "run_id": run_id,
         "experiment_group_id": display_path(status_path.parent), "status": exported_status,
         "source_status": source_status, "source_result_path": display_path(status_path),
-        "provenance": {"adapter": "cowboys_checkpoint_v1", "sources": artifact["sources"],
+        "provenance": {"adapter": f"{solver}_checkpoint_v1", "sources": artifact["sources"],
                        "optimization_environment": None,
                        "export_environment": {"python": platform.python_version(),
                            **{name: _version(name) for name in ("numpy", "rdkit", "selfies")}}},
@@ -203,13 +206,14 @@ def build_run(status_path, *, task_config=None, planned_bo_steps=None):
                  "direction": direction, "score_transform": "identity" if direction == "maximize" else "negate_recorded_score",
                  "score_normalization": "none; recorded objective scale", "score_range": None,
                  "direction_source": "task_config" if "score_direction" in config else "existing_runner_maximizes_recorded_objective"},
-        "algorithm": {"name": "COWBOYS", "config": saved_config},
+        "algorithm": {"name": MOLECULAR_SOLVERS[solver], "config": saved_config},
         "design": {"seed": status["seed"], "initial_design_id": None,
                    "initial_content_sha256": initial_hash,
                    "n_initial_planned": None, "n_initial_observed": n_initial,
                    "max_oracle_calls_planned": None,
-                   "initialization_policy": config.get("initialization_policy", "source_history_initial_prefix; original sampling policy not logged"),
-                   "initialization_policy_source": "task_config" if config.get("initialization_policy") else "not_recorded",
+                   "initialization_policy": initialization_policy or "source_history_initial_prefix; original sampling policy not logged",
+                   "initialization_policy_source": ("task_config" if config.get("initialization_policy") else
+                                                    "solver_configuration" if initialization_policy else "not_recorded"),
                    "bo_steps_planned": planned, "batch_size": batch, "budget_unit": "BO_steps",
                    "planned_budget_source": "task_config" if "bo_steps_planned" in config else
                        ("export_argument" if planned is not None else None)},
@@ -243,13 +247,16 @@ def _pmo_tasks():
     return read_json(catalog)["tasks"] if io_path(catalog).exists() else {}
 
 
-def export_directory(results_dir, *, recursive=False, task_configs=None, planned_bo_steps=None):
+def export_directory(results_dir, *, recursive=False, task_configs=None, planned_bo_steps=None, solver="cowboys"):
     root = Path(results_dir).resolve()
     if not io_path(root).is_dir():
         raise ValueError(f"Results directory does not exist: {root}")
     if task_configs is not None and not isinstance(task_configs, dict):
         raise ValueError("--task-config must be a JSON object keyed by task name")
-    paths = sorted(io_path(root).rglob("cowboys_*_status.json") if recursive else io_path(root).glob("cowboys_*_status.json"))
+    if solver not in MOLECULAR_SOLVERS:
+        raise ValueError(f"Unsupported molecular solver: {solver}")
+    discover = io_path(root).rglob if recursive else io_path(root).glob
+    paths = sorted(discover(f"{solver}_*_status.json"))
     outputs, issues, seen_families = [], [], set()
     for path in paths:
         relative = path.relative_to(io_path(root))
@@ -260,6 +267,8 @@ def export_directory(results_dir, *, recursive=False, task_configs=None, planned
             metadata = read_json(path)
             if not isinstance(metadata, dict):
                 raise ValueError("Status JSON must be an object")
+            if metadata.get("solver_name") != solver:
+                raise ValueError("Solver in status JSON disagrees with the selected solver")
             task = metadata.get("function_name")
             run = build_run(path, task_config=(task_configs or {}).get(task), planned_bo_steps=planned_bo_steps)
             validate_run(run)
@@ -272,7 +281,7 @@ def export_directory(results_dir, *, recursive=False, task_configs=None, planned
         except (ValueError, OSError, KeyError, TypeError) as exc:
             issues.append({"source": display_path(path), "missing_reason": str(exc)})
     # Report artifacts whose provenance/boundaries cannot safely be inferred from names.
-    candidates = io_path(root).rglob("cowboys_*.n*") if recursive else io_path(root).glob("cowboys_*.n*")
+    candidates = discover(f"{solver}_*.n*")
     for path in sorted(candidates):
         if any(part in {"metrics", "preflight"} for part in path.relative_to(io_path(root)).parts):
             continue
@@ -280,7 +289,7 @@ def export_directory(results_dir, *, recursive=False, task_configs=None, planned
         if path.with_name(stem) not in seen_families:
             issues.append({"source": display_path(path), "missing_reason": "No companion status metadata; cannot establish task/seed/initialization safely"})
     sweep = io_path(root) / "sweep_status.tsv"
-    if sweep.exists():
+    if solver == "cowboys" and sweep.exists():
         import csv
         with sweep.open(encoding="utf-8", newline="") as stream:
             for row in csv.DictReader(stream, delimiter="\t"):
