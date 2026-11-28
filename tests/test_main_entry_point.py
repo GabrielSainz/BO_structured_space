@@ -13,6 +13,8 @@ SOLVERS_THAT_RUN_IN_BASE_ENV = [
     solver_name
     for solver_name in SOLVER_NAMES
     if SOLVER_NAME_TO_ENV[solver_name] == "hdbo_benchmark"
+    # AFGG has a separate molecular smoke command with external NFBO weights.
+    and solver_name != "afgg_seqflow"
 ]
 
 MAX_ITER = 1

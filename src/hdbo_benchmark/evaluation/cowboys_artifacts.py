@@ -1,10 +1,12 @@
-"""Read the current COWBOYS checkpoint family without importing optimization code."""
+"""Read molecular runner checkpoints without importing optimization code."""
 
 from pathlib import Path
 
 import numpy as np
 
 from .metric_io import clean, digest_file, display_path, io_path, read_json
+
+MOLECULAR_SOLVERS = {"cowboys": "COWBOYS", "afgg_seqflow": "AFGG (SeqFlow)"}
 
 
 def _companion(status_path, name, suffix):
@@ -16,12 +18,13 @@ def _companion(status_path, name, suffix):
     return expected
 
 
-def load_cowboys(status_path: Path):
+def load_molecular_checkpoint(status_path: Path, *, solver=None):
     status = read_json(status_path)
     if not isinstance(status, dict) or not isinstance(status.get("solver_configuration", {}), dict):
         raise ValueError("Status and solver_configuration must be JSON objects")
-    if status.get("solver_name") != "cowboys":
-        raise ValueError("This adapter supports solver_name=cowboys only")
+    name = status.get("solver_name")
+    if name not in MOLECULAR_SOLVERS or (solver is not None and name != solver):
+        raise ValueError(f"Unexpected molecular checkpoint solver: {name}")
     if not isinstance(status.get("function_name"), str) or not isinstance(status.get("seed"), int):
         raise ValueError("Task name and integer seed must be recorded in status JSON")
     sources = [status_path]
@@ -89,3 +92,7 @@ def load_cowboys(status_path: Path):
     return {"status": status, "scores": scores, "structures": structures,
             "iterations": clean(iterations), "predictions": clean(predictions), "warnings": warnings,
             "sources": [{"path": display_path(p), "sha256": digest_file(p)} for p in sources]}
+
+
+def load_cowboys(status_path: Path):
+    return load_molecular_checkpoint(status_path, solver="cowboys")

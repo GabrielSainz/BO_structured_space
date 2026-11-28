@@ -13,6 +13,7 @@ documented below.
 
 | Local method / CLI key | Implementation |
 |---|---|
+| AFGG with SeqFlow (`afgg_seqflow`) | `src/hdbo_benchmark/solvers/afgg_seqflow.py` |
 | COWBOYS ? `cowboys` | `src/hdbo_benchmark/solvers/cowboys.py` |
 | Flow COWBOYS ? `cowboys_flow` | `src/hdbo_benchmark/solvers/cowboys_flow.py` |
 | Second flow variant ? `cowboys_flow_2` | `src/hdbo_benchmark/solvers/cowboys_flow_2.py` |
@@ -106,6 +107,8 @@ The corrected baseline and automatic paper comparison run through
 `bash scripts/experiments/run.sh` in the activated environment. Its preflight,
 fresh output directories and remaining classifier limitations are explained in
 [COWBOYS_IMPLEMENTATION.md](docs/COWBOYS_IMPLEMENTATION.md).
+The [AFGG SeqFlow protocol](docs/AFGG_SEQFLOW.md) covers the released sequential
+settings, local and Hendrix smoke tests, the five-task GPU array and metric export.
 Flow, diffusion and LSBO launchers are described
 in [scripts/README.md](scripts/README.md). Use Git Bash/WSL on Windows for shell
 scripts. Inspect budgets before launching sweeps. Slurm batch files are under
@@ -143,7 +146,8 @@ Edit canonical implementations under `src/hdbo_benchmark/`. See the
 
 The current runner saves best-performance `.npy`, available history `.npz`,
 status JSON and requested iteration-metric JSON. COWBOYS writes to
-`results/cowboys/<sufix>/`. Other non-diffusion output goes to
+`results/cowboys/<sufix>/` and AFGG writes to `results/afgg_seqflow/<sufix>/`.
+Other non-diffusion output goes to
 `results/new_vae_10_chain_100_steps_with_stoch_sampling_<sufix>/`; diffusion
 outputs use the existing parameter-derived subdirectories under
 `results/diffusion/`. Filenames include solver, function and seed. Older runners

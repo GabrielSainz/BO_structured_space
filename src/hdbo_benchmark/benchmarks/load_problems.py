@@ -180,8 +180,20 @@ def load_problem(
     max_iter: int,
     set_observer: bool = True,
     observer_config: ObserverConfig = None,
+    initial_smiles: list[str] | None = None,
 ):
-    problem = _load_problem(function_name)
+    if initial_smiles is None:
+        problem = _load_problem(function_name)
+    else:
+        if function_name not in PMOBenchmark(string_representation="SMILES").problem_names:
+            raise ValueError("A SMILES initial design requires a PMO objective")
+        ensure_tdc_is_available()
+        patch_broken_tdc_chem_utils()
+        problem = poli.create(name=function_name, string_representation="SMILES")
+        expose_tdc_evaluation_errors(problem.black_box)
+        x0 = np.asarray(initial_smiles).reshape(-1, 1)
+        problem.data_package = DataPackage(unsupervised_data=x0, supervised_data=None)
+        problem = turn_into_supervised_problem(problem)
 
     if problem.data_package.supervised_data is None:
         raise ValueError("Expected the problem to have a supervised dataset attached.")
